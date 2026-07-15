@@ -1,0 +1,45 @@
+[package]
+name = "iron-instance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "IronServer vLLM Instance (production). Real TDX + NVIDIA attestation, real vLLM proxy. No dev flags, no stub code paths."
+
+[lib]
+name = "iron_instance"
+path = "src/lib.rs"
+
+[[bin]]
+name = "iron-instance"
+path = "src/main.rs"
+
+# Ring is the single crypto backend across the tree. axum-server's `tls-rustls` feature would
+# force `rustls/aws-lc-rs`; `tls-rustls-no-provider` gives the same TLS machinery and lets us
+# pick the provider, keeping the aws-lc-rs C toolchain (cmake/bindgen) out of the reproducible
+# NixOS build. jsonwebtoken uses its pure-Rust `rust_crypto` backend for the same reason.
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
+tokio-stream = "0.1"
+axum = "0.8"
+tower = "0.5"
+axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging"] }
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+getrandom = "0.4"
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto", "use_pem"] }
+x509-parser = { version = "0.18", features = ["verify"] }
+p256 = "0.14"
+# Loopback HTTP client for the vLLM proxy (chat.rs). No outbound reach beyond 127.0.0.1.
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio"] }
+http-body-util = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+uuid = { version = "1", features = ["v5"] }
+base64 = "0.22"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }

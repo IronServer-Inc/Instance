@@ -1,0 +1,464 @@
+{
+  "_comment": [
+    "Pinned, measured artifact list. This file is part of the NixOS image, so its bytes are",
+    "covered by the TDX measurement -- changing anything here changes the image hash, which is",
+    "exactly the point. Boot fetches each entry, verifies its sha256, and REFUSES TO START on any",
+    "mismatch, so it does not matter who serves the bytes: a hostile mirror can only deny service,",
+    "never substitute weights or code.",
+    "",
+    "PINNED: nvidia/Kimi-K2.7-Code-NVFP4 at an immutable commit (67 shards + configs by sha256) and vLLM by OCI digest. Re-pin ONLY via  nix run .#pin-artifacts -- <hf-repo> <revision> [vllm-tag]  -- never hand-write a hash. If files is emptied or a digest cleared, the image fails closed."
+  ],
+  "vllm": {
+    "_comment": "Official vLLM OCI image, pinned by digest (a sha256 over the manifest, covering every layer; podman verifies on pull). TP=8 uses the full HGX B200 board: ~74GB of weights per GPU leaves ~105GB/GPU for KV cache, which is what 400 concurrent users actually need. NOTE --trust-remote-code: vLLM EXECUTES the repo's .py files, so they are pinned by sha256 below and sit inside the measurement -- an auditor can review exactly what code runs.",
+    "image": "docker.io/vllm/vllm-openai",
+    "digest": "sha256:28568563c4600d2c30b56ceba0ac6b4167c3b0b1d60c4c978d8c769877baa778",
+    "args": [
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8000",
+      "--served-model-name",
+      "ironserver",
+      "--tensor-parallel-size",
+      "8",
+      "--tool-call-parser",
+      "kimi_k2",
+      "--reasoning-parser",
+      "kimi_k2",
+      "--trust-remote-code",
+      "--disable-log-requests"
+    ]
+  },
+  "model": {
+    "_comment": "Public HuggingFace files, each pinned by sha256 (weight shards take their hash from HF's lfs.oid, which IS the file's sha256). revision is an immutable commit, never a branch. 595 GB across 67 shards: this does NOT fit one B200 (180 GB) — see README on GPU count.",
+    "repo": "nvidia/Kimi-K2.7-Code-NVFP4",
+    "revision": "9f28d60908c98034bb288e755566764eac77cc0d",
+    "files": [
+      {
+        "path": ".quant_summary.txt",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/.quant_summary.txt",
+        "sha256": "dc22ee96762a7502e715b8812d4659be9898faaad3e5df8ceeac7d71d9610a27"
+      },
+      {
+        "path": "chat_template.jinja",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/chat_template.jinja",
+        "sha256": "8d21200dff7e85beaf51c8b110952e039ffd0779f615d64d63293d74773360f9"
+      },
+      {
+        "path": "config.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/config.json",
+        "sha256": "b203b07a34c3462df0b30eea7c99cc31b3d682c365cacc75edb8823a0ab97758"
+      },
+      {
+        "path": "configuration_deepseek.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/configuration_deepseek.py",
+        "sha256": "c1327c307e2dd11d1bf0adc8bcef69ae51f9617a3a869a9497bb08aec912f931"
+      },
+      {
+        "path": "configuration_kimi_k25.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/configuration_kimi_k25.py",
+        "sha256": "2bc5487efced291e0e6aa3b24aad1082bade4172aff94ea1b6f0ae20a1d6bb4f"
+      },
+      {
+        "path": "generation_config.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/generation_config.json",
+        "sha256": "b784cc6a9ecb551196b81cb6b1d2dcb18467b92adaab6992ae4cc455ad44d2ce"
+      },
+      {
+        "path": "hf_quant_config.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/hf_quant_config.json",
+        "sha256": "4baf41307796a29aa0dc67de3ab33d590b9ad20bac5042b22dac842b3ecb766c"
+      },
+      {
+        "path": "kimi_k25_processor.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/kimi_k25_processor.py",
+        "sha256": "537d7a708e1654766fc628c99667bdb9364136d3541633d6522ac43cef9bfea0"
+      },
+      {
+        "path": "kimi_k25_vision_processing.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/kimi_k25_vision_processing.py",
+        "sha256": "498e20753c9aa6b6224ddbcd05b04deb7e987b76595bf5c28ee8583f33ebc375"
+      },
+      {
+        "path": "media_utils.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/media_utils.py",
+        "sha256": "77a6b1fed3580b0562443092928a0240c2989e3950377e93893952123ae48e3d"
+      },
+      {
+        "path": "model-00001-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00001-of-00067.safetensors",
+        "sha256": "afea5a21e102bc5b7db41e7eed111bdbfd1cada1a0bbd796bf894bc46c0b5949"
+      },
+      {
+        "path": "model-00002-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00002-of-00067.safetensors",
+        "sha256": "aca7e29d27a3817b391573e401748de76419705efd04cf012322cc3b80727203"
+      },
+      {
+        "path": "model-00003-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00003-of-00067.safetensors",
+        "sha256": "4a34f7df658b9e9b7593c797ac75ab8ab080b0529c81b62847d87f31c57a6291"
+      },
+      {
+        "path": "model-00004-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00004-of-00067.safetensors",
+        "sha256": "51fa948597caae3bd28c7ffbb585fb4b2fa9c3421cb099ef6dc13ebea9f18622"
+      },
+      {
+        "path": "model-00005-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00005-of-00067.safetensors",
+        "sha256": "67f237fe3775bdd1c5bf4050756dc7a6b41117d10b9382e1aa151938f24689f7"
+      },
+      {
+        "path": "model-00006-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00006-of-00067.safetensors",
+        "sha256": "c8aeb4955f49103bb96e7f0fcac046695c6f14d8b8b82263e4c9934ac729d276"
+      },
+      {
+        "path": "model-00007-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00007-of-00067.safetensors",
+        "sha256": "34da886add9c15b76837d0cca0786921a8bd00efccbc446522c36803db2f01ed"
+      },
+      {
+        "path": "model-00008-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00008-of-00067.safetensors",
+        "sha256": "a42ca65f9ea836dd3b6d3985c386876dc842600a0824d1ffe6785afa33eb62a1"
+      },
+      {
+        "path": "model-00009-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00009-of-00067.safetensors",
+        "sha256": "0ed46fe137c61b0be7bf44a7326d022d997f944dc9be418ad7d80cea3f074ef3"
+      },
+      {
+        "path": "model-00010-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00010-of-00067.safetensors",
+        "sha256": "f4bbb9aa2106c9a2f6a44c42e8f99f5e2e8a99080bce678efb6af00d0aae2fe1"
+      },
+      {
+        "path": "model-00011-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00011-of-00067.safetensors",
+        "sha256": "51e6d2ce8b9589ec287d22f6b96dfd61c9d2f29d84d6d22b4bf68abd673fd22e"
+      },
+      {
+        "path": "model-00012-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00012-of-00067.safetensors",
+        "sha256": "5eb4011f40b7a0bef080a112e207a886e640e94e5a4b1614428d82309c738b54"
+      },
+      {
+        "path": "model-00013-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00013-of-00067.safetensors",
+        "sha256": "14f5266cdc21a18275f8a629a22e9a83081d61bdd77189aff8dc250f1b8613fb"
+      },
+      {
+        "path": "model-00014-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00014-of-00067.safetensors",
+        "sha256": "5e73fb807bb3fc7c15b0dfa6a0079559bc1892bfa2bd153f2c58fb868ce51411"
+      },
+      {
+        "path": "model-00015-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00015-of-00067.safetensors",
+        "sha256": "f790fe50fe39ddfa96480c5da548674af9a615a3998c23ab547508bb479c67fb"
+      },
+      {
+        "path": "model-00016-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00016-of-00067.safetensors",
+        "sha256": "b604a92d8f46a85266c9c9c0e1b852f730d881bf51e163384f8099b6fca7d7ad"
+      },
+      {
+        "path": "model-00017-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00017-of-00067.safetensors",
+        "sha256": "a207be9745510089e4513fe3efea6f74d56590653582bf97fcc1910d7fb665a2"
+      },
+      {
+        "path": "model-00018-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00018-of-00067.safetensors",
+        "sha256": "cb6289b5facfd6fd243b2a3154255e2d096f836c53b3a6105cfd6f5e86e862b1"
+      },
+      {
+        "path": "model-00019-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00019-of-00067.safetensors",
+        "sha256": "ca2a5b3966d8fe145a563a5ba0d7d98f17289f1d46050df9b69d344e461b86b5"
+      },
+      {
+        "path": "model-00020-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00020-of-00067.safetensors",
+        "sha256": "22a704bfc716e60cca2dfbcff5f73799dfc01a545a858db571d0621dee6ed7dc"
+      },
+      {
+        "path": "model-00021-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00021-of-00067.safetensors",
+        "sha256": "b9db086d67980f75c1b6c02212544daba7ed02325130b82bad113b43c315a3c1"
+      },
+      {
+        "path": "model-00022-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00022-of-00067.safetensors",
+        "sha256": "0a9e741926035075160fdc4884f8557022f27adf37d5324db7eedc91f313773a"
+      },
+      {
+        "path": "model-00023-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00023-of-00067.safetensors",
+        "sha256": "2853b6a0ff6705d9175d5ab4fa64b2c371598d1a0b01b632a44d7e40b9d9d7df"
+      },
+      {
+        "path": "model-00024-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00024-of-00067.safetensors",
+        "sha256": "e29e30123e3c29971b3458d81b4c33cda8789ddbad159038f9c1992a63e14dfe"
+      },
+      {
+        "path": "model-00025-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00025-of-00067.safetensors",
+        "sha256": "56e90667ba7a23f372c4f2d41ec9b8ea17ffce0fa8fdd3425729a42c1d7eca8c"
+      },
+      {
+        "path": "model-00026-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00026-of-00067.safetensors",
+        "sha256": "9f442faf1e41452ccffa891024d83ca309df9b853530db4455f0ac6bfbc46f1e"
+      },
+      {
+        "path": "model-00027-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00027-of-00067.safetensors",
+        "sha256": "64e3af477ae8944ce53069653eb225754cdf34f48ca725d766b0085dae4cd965"
+      },
+      {
+        "path": "model-00028-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00028-of-00067.safetensors",
+        "sha256": "054c33785dd193fb6889a6cd6514437921ba76505b2666a268e7c4cf58fce9c4"
+      },
+      {
+        "path": "model-00029-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00029-of-00067.safetensors",
+        "sha256": "64a2b6ff79a88d43257ed64c8129ede86915fee73445e0546e5916b532ff75e5"
+      },
+      {
+        "path": "model-00030-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00030-of-00067.safetensors",
+        "sha256": "cfef6de278a8022d5674befa7b04617475a3d307c367c2a5dc298433d3134ac9"
+      },
+      {
+        "path": "model-00031-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00031-of-00067.safetensors",
+        "sha256": "98a67e3264bbe3639d641715adbe749a8512cbba43cc53e9fa772643dfe4640a"
+      },
+      {
+        "path": "model-00032-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00032-of-00067.safetensors",
+        "sha256": "a1465b14d0355c755eb6a8c5c6aad1cb5d6f205645ed76d1752cc1a1f7652189"
+      },
+      {
+        "path": "model-00033-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00033-of-00067.safetensors",
+        "sha256": "5182f4d83712346a46fadbd20e8bd59727da4b1240275bf0797b9b49ac969f45"
+      },
+      {
+        "path": "model-00034-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00034-of-00067.safetensors",
+        "sha256": "bbd10820ac988eac393390dee6ff64b44866457909e5443edb672683f1217e5b"
+      },
+      {
+        "path": "model-00035-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00035-of-00067.safetensors",
+        "sha256": "836bf76960dc5fc4c539771613109af160881e1c31b2ed30f4223e56e14bb81a"
+      },
+      {
+        "path": "model-00036-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00036-of-00067.safetensors",
+        "sha256": "abcc0286d0eb8aa47d0a16dc4e78f14299df8848d421b56dd38419c14690827b"
+      },
+      {
+        "path": "model-00037-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00037-of-00067.safetensors",
+        "sha256": "cd2d979c5df90d4a9224d9bbeb888b720793ba27c1eae5dc195500808efcb6ed"
+      },
+      {
+        "path": "model-00038-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00038-of-00067.safetensors",
+        "sha256": "5ed9ee4993c43e2c3fd25a42e17e01e6546d5d839f716160d43f00c950876a32"
+      },
+      {
+        "path": "model-00039-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00039-of-00067.safetensors",
+        "sha256": "210bec71dc899af512e4ad91635852b2230932adaed1412a285be1393801c660"
+      },
+      {
+        "path": "model-00040-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00040-of-00067.safetensors",
+        "sha256": "c082fe61b7e45543ddf4cb6d628af4b19ddd7db70bfd19d2f629d19133506879"
+      },
+      {
+        "path": "model-00041-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00041-of-00067.safetensors",
+        "sha256": "a28a05efa7468262a049bc995435c4f9c503378e28d8d655a8606ad05028d223"
+      },
+      {
+        "path": "model-00042-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00042-of-00067.safetensors",
+        "sha256": "7a6096b6bda94562791c6b33abf007974117b3221718d8f104dd6c51e195fbaf"
+      },
+      {
+        "path": "model-00043-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00043-of-00067.safetensors",
+        "sha256": "f1210f7513f8c049bf4da36ff61677b35a7306c9b3c3a0002710dff9e62c357d"
+      },
+      {
+        "path": "model-00044-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00044-of-00067.safetensors",
+        "sha256": "1b4b3e6cf8cfa0155c30106623f69a82e38e7db973e986748fd03ae7318bd3dc"
+      },
+      {
+        "path": "model-00045-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00045-of-00067.safetensors",
+        "sha256": "047a7d19631533adbb18df75f02c71a3830dff87a564a1e2254ae4842a496fb6"
+      },
+      {
+        "path": "model-00046-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00046-of-00067.safetensors",
+        "sha256": "49921b4a131c4b825d9197070cf2bcbc8abf74a9beb26871a1813e3229a379a9"
+      },
+      {
+        "path": "model-00047-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00047-of-00067.safetensors",
+        "sha256": "17941360a8a4ca161d8a312603290f8397d0650009b43dfbd9d7d49779f40589"
+      },
+      {
+        "path": "model-00048-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00048-of-00067.safetensors",
+        "sha256": "064cc57e8edceed9152276b1cad390a12d3b70c7ba34e6f242fc7cce25d81dbb"
+      },
+      {
+        "path": "model-00049-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00049-of-00067.safetensors",
+        "sha256": "bf3a4b42483f02dfc818bf83d2c800ecd4a6d07fab1bd567b50108a6cdeda985"
+      },
+      {
+        "path": "model-00050-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00050-of-00067.safetensors",
+        "sha256": "8b75e8ae0e5bedac34f17a442ca92aa52255c32489bd83a1a36610bd697f3985"
+      },
+      {
+        "path": "model-00051-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00051-of-00067.safetensors",
+        "sha256": "c9f5ddbc61dc485cfc80c71cfd6938636f38e0f7b310d832242f0946c1507e39"
+      },
+      {
+        "path": "model-00052-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00052-of-00067.safetensors",
+        "sha256": "23fb974b9b4877ee4eb5571154d8c3da4597e0926859e27b5537ae4cb1b3b828"
+      },
+      {
+        "path": "model-00053-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00053-of-00067.safetensors",
+        "sha256": "64ddc8fd9ec4372d6c328bbaec0a711ff7e55d6cddca0723f3702919b3846675"
+      },
+      {
+        "path": "model-00054-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00054-of-00067.safetensors",
+        "sha256": "91ae4a866af9e80819bffd576e181f43a8e2bf1e7c88b4aa91d6a67a84ce41e2"
+      },
+      {
+        "path": "model-00055-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00055-of-00067.safetensors",
+        "sha256": "aea7332d38a3bc0937149a79350c0abd13eeb45f6f7f303ba498c14686045da5"
+      },
+      {
+        "path": "model-00056-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00056-of-00067.safetensors",
+        "sha256": "6af9c86af1b6c56da4b2baa57d2ee8d77acce2aa8c54bac25b1a8969b6123dd5"
+      },
+      {
+        "path": "model-00057-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00057-of-00067.safetensors",
+        "sha256": "0e36cfb4bb4da326fcdfec3d89f69a99d4968e2a249742a259bda0fbdbf76821"
+      },
+      {
+        "path": "model-00058-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00058-of-00067.safetensors",
+        "sha256": "1704757c0e1b762d1ea9146ad1dc08e0d3b1701e560fb8de7a5448fc5fa6049e"
+      },
+      {
+        "path": "model-00059-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00059-of-00067.safetensors",
+        "sha256": "2b25d94cbfc4faed0420f599bf32f817631a51a2d14b9bee19e6c794189c47f3"
+      },
+      {
+        "path": "model-00060-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00060-of-00067.safetensors",
+        "sha256": "3cc30a95da1494b50c4a5402420caf5c841adcd63f13de1a9487cc63dcec6407"
+      },
+      {
+        "path": "model-00061-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00061-of-00067.safetensors",
+        "sha256": "a2ac58df8941ca72da60e45d97f10a927914a8daa7c5599f6dda878578155ded"
+      },
+      {
+        "path": "model-00062-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00062-of-00067.safetensors",
+        "sha256": "b40d8b2a13d1900b2a4af668f11ec16adafec030eeec85268bee56dc18158b1e"
+      },
+      {
+        "path": "model-00063-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00063-of-00067.safetensors",
+        "sha256": "dbbee924fec2ae4efae264c35e31952ea2bc33fb0999c471c2d6d2ec85ad503c"
+      },
+      {
+        "path": "model-00064-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00064-of-00067.safetensors",
+        "sha256": "17af0d8dfe2348e63ce5606231de2287dd46718c640c653675953d2aa5f0cd06"
+      },
+      {
+        "path": "model-00065-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00065-of-00067.safetensors",
+        "sha256": "f428f003f537c335ea4aa6a7d1ba88b7f6c1faa1232f18fe70eb0436f8232ea0"
+      },
+      {
+        "path": "model-00066-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00066-of-00067.safetensors",
+        "sha256": "2b76b71ec778b0b0d53f08623c73d827d67cbca080d73df53981cb0044678c48"
+      },
+      {
+        "path": "model-00067-of-00067.safetensors",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model-00067-of-00067.safetensors",
+        "sha256": "bebd5231593bbe6bbcb4b1af93a66415ec37389974fe4f73c01aad9cce5cb065"
+      },
+      {
+        "path": "model.safetensors.index.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/model.safetensors.index.json",
+        "sha256": "c02c119d7c06db3f5524b1c354f5bbb972977b176f126884c93000cf12c9de70"
+      },
+      {
+        "path": "modeling_deepseek.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/modeling_deepseek.py",
+        "sha256": "17e079e0a5e41114aabd2ae5ba924128ba6652bc6f9a00ea06efcd1230340406"
+      },
+      {
+        "path": "modeling_kimi_k25.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/modeling_kimi_k25.py",
+        "sha256": "a1594f129ae8dc5fa3c9dbbc24e8e603b30d7caef1226669b4d95dc8f2a3e2dd"
+      },
+      {
+        "path": "preprocessor_config.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/preprocessor_config.json",
+        "sha256": "bd9a1f5d7b1580b38093c35ca49162580a118485164fac48e1cdb224ee41fcff"
+      },
+      {
+        "path": "tiktoken.model",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/tiktoken.model",
+        "sha256": "b6c497a7469b33ced9c38afb1ad6e47f03f5e5dc05f15930799210ec050c5103"
+      },
+      {
+        "path": "tokenization_kimi.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/tokenization_kimi.py",
+        "sha256": "88394687bd081f55928849b2d140e190c70297660d3fb8b7c54c0e5633b177e3"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/tokenizer_config.json",
+        "sha256": "6dfafeacca3d44748fc4a2fcc6725be5ea616ecc5b95f5a8b4277077c06e7d9f"
+      },
+      {
+        "path": "tool_declaration_ts.py",
+        "url": "https://huggingface.co/nvidia/Kimi-K2.7-Code-NVFP4/resolve/9f28d60908c98034bb288e755566764eac77cc0d/tool_declaration_ts.py",
+        "sha256": "97e09ed262f1cd38f87584eaa46c5d4d5b3c9725dd299b21642f389040794ebc"
+      }
+    ]
+  }
+}

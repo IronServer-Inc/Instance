@@ -79,7 +79,7 @@ echo "==> Collecting sha256 (LFS: from lfs.oid; small files: downloaded and hash
 ENTRIES="[]"
 LFS_N=0; SMALL_N=0
 
-while IFS=$'\t' read -r path size lfsoid; do
+while IFS=$'\t' read -r path lfsoid; do
   [[ "$path" =~ $EXCLUDE ]] && continue
   url="https://huggingface.co/${REPO}/resolve/${COMMIT}/${path}"
 
@@ -97,7 +97,7 @@ while IFS=$'\t' read -r path size lfsoid; do
   ENTRIES=$(jq --arg p "$path" --arg u "$url" --arg s "$sha" \
                '. + [{path: $p, url: $u, sha256: $s}]' <<<"$ENTRIES")
   printf '    %s  %s\n' "${sha:0:12}…" "$path"
-done < <(jq -r '.[] | select(.type=="file") | [.path, (.size|tostring), (.lfs.oid // "")] | @tsv' "${WORK}/tree.json")
+done < <(jq -r '.[] | select(.type=="file") | [.path, (.lfs.oid // "")] | @tsv' "${WORK}/tree.json")
 
 TOTAL=$(jq -r '[.[] | select(.type=="file") | .size] | add' "${WORK}/tree.json")
 

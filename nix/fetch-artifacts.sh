@@ -38,6 +38,8 @@ FILE_COUNT=$(jq -r '.model.files | length' "$ARTIFACTS")
 
 if [[ "$RUN_VLLM" == "1" ]]; then
   # iron-artifacts.service already verified everything; just run the pinned image.
+  # One argv entry per JSON array element -- an arg containing a space stays one arg.
+  mapfile -t VLLM_ARGS < <(jq -r '.vllm.args[]' "$ARTIFACTS")
   exec podman run --rm \
     --name vllm \
     --network=host \
@@ -46,7 +48,7 @@ if [[ "$RUN_VLLM" == "1" ]]; then
     -v "${MODEL_DIR}:/model:ro" \
     "${IMAGE}@${DIGEST}" \
     --model /model \
-    $(jq -r '.vllm.args[]' "$ARTIFACTS" | tr '\n' ' ')
+    "${VLLM_ARGS[@]}"
 fi
 
 echo "iron-artifacts: model ${REPO}@${REVISION}, ${FILE_COUNT} file(s)"

@@ -77,6 +77,12 @@ in
   # GPU: NVIDIA driver with Confidential Computing
   ############################################################################
 
+  # The NVIDIA driver is the only unfree package allowed in the image; the predicate
+  # (rather than a blanket allowUnfree) enforces that. It must live here, not in the
+  # flake: nixosSystem instantiates its own nixpkgs, so flake-level pkgs config never
+  # reaches module evaluation.
+  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "nvidia-x11" ];
+
   hardware.graphics.enable = true;
   hardware.nvidia = {
     # CC mode requires the OPEN kernel modules. The proprietary blob does not support it.

@@ -8,11 +8,11 @@
   outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs {
-        inherit system;
-        # The NVIDIA driver is unfree. Nothing else here is.
-        config.allowUnfree = true;
-      };
+      # This pkgs only drives the crate build, the image-assembly tooling and pin-artifacts,
+      # all free software. Unfree handling for the NVIDIA driver lives in nix/configuration.nix
+      # (nixpkgs.config.allowUnfreePredicate) because nixosSystem instantiates its own nixpkgs
+      # and never sees config set here.
+      pkgs = import nixpkgs { inherit system; };
       # This flake sits at the crate root so that src/, pinned/ and Cargo.lock are all inside
       # the flake source. A flake only ever copies its own directory into the store, so a
       # flake under nix/ could not reach them.

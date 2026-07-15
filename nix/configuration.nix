@@ -59,6 +59,21 @@ in
   ];
 
   ############################################################################
+  # Filesystems. make-disk-image.nix labels the partitions it creates (root:
+  # ext4 "nixos", ESP: vfat "ESP") but leaves declaring them to this config;
+  # evaluation fails without a root fileSystems entry.
+  ############################################################################
+
+  fileSystems."/" = {
+    device = "/dev/disk/by-label/nixos";
+    fsType = "ext4";
+  };
+  fileSystems."/boot" = {
+    device = "/dev/disk/by-label/ESP";
+    fsType = "vfat";
+  };
+
+  ############################################################################
   # GPU: NVIDIA driver with Confidential Computing
   ############################################################################
 
@@ -87,6 +102,9 @@ in
   services.openssh.enable = false;
   users.mutableUsers = false;
   users.users.root.hashedPassword = "!"; # locked; no console login either
+  # NixOS refuses to evaluate a config nobody can log in to unless told the
+  # lockout is deliberate. Here it is the design: no SSH, no console, no admin plane.
+  users.allowNoPasswordLogin = true;
   security.sudo.enable = false;
   services.getty.autologinUser = null;
 

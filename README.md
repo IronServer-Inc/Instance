@@ -140,6 +140,12 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 nix build .#image                    # -> result/nixos.img  (raw, ~40 GB sparse)
 ```
 
+The disk is assembled inside a QEMU VM, so the derivation requires the `kvm` system feature.
+On a builder without `/dev/kvm` (most cloud VMs unless nested virtualization is enabled), add
+`extra-system-features = kvm` to `/etc/nix/nix.custom.conf` (Determinate Nix manages `nix.conf`
+itself) and restart `nix-daemon`: QEMU is invoked with `accel=kvm:tcg`, so assembly falls back
+to software emulation — slower, byte-identical output.
+
 On a Mac you can still *evaluate* the flake (host-agnostic) to catch errors and refresh
 `flake.lock` — `cargo clean` first (a non-git flake copies its whole dir into the store), then
 `nix flake check`. You cannot build the image there. Use the **Determinate** installer because it
@@ -244,7 +250,6 @@ of the first paid GPU session. Budget for it to overrun.
 | Surface | Why unverified | Lives in |
 |---|---|---|
 | **configfs-tsm under a locked-down service** | `iron-instance.service` runs `DynamicUser` + only `CAP_NET_BIND_SERVICE`, but creating a `/sys/kernel/config/tsm/report/*` entry needs root/`CAP_DAC_OVERRIDE`. **As wired, every `/attestation` may 503.** Fix + validate first. | `nix/configuration.nix`, `src/attestation.rs` |
-| The image builds at all | never built (no Nix on the dev Mac) | `nix/`, `flake.nix` |
 | NVIDIA driver in CC mode; NVML attestation over all 8 GPUs | needs a B200 with CC on | `nix/configuration.nix`, `nix/gpu-report.py` |
 | NVLE mode + per-GPU `FEATURE_FLAG == MPT` | the one CC value inferred, not confirmed on B200; verifier fails closed if wrong | `nix/gpu-report.py`, `src/attestation.rs`, iOS `AttestationVerifier` |
 | Real signed-report layout (request‖response, 8 device certs) | modelled on nvtrust + a Hopper sample; never parsed from a live B200 | `src/attestation.rs`, iOS `AttestationVerifier` |

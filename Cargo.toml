@@ -2,6 +2,11 @@
 name = "iron-instance"
 version = "0.1.0"
 edition = "2021"
+# nixpkgs 25.05 builds the image with rustc 1.86; resolver v3 (MSRV-aware, not the
+# edition-2021 default) keeps every locked dependency compatible with it. Bump
+# rust-version in lockstep with the flake's nixpkgs.
+rust-version = "1.86"
+resolver = "3"
 publish = false
 description = "IronServer vLLM Instance (production). Real TDX + NVIDIA attestation, real vLLM proxy. No dev flags, no stub code paths."
 

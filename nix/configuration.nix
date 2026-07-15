@@ -4,8 +4,10 @@ let
   ironInstance = pkgs.callPackage ./package.nix { inherit ironSrc; };
 
   # Pinned, MEASURED artifact list. Its bytes are part of the image, so changing what we fetch
-  # changes the image hash. See pinned/artifacts.json.
-  artifacts = ironSrc + "/pinned/artifacts.json";
+  # changes the image hash. Copied to its own store path so systemd units reference a path
+  # derived from these bytes alone -- referencing ironSrc directly would tie the image to the
+  # whole flake tree's hash, which moves on every doc edit. See pinned/artifacts.json.
+  artifacts = pkgs.writeText "artifacts.json" (builtins.readFile (ironSrc + "/pinned/artifacts.json"));
 
   # Fetch + sha256-verify every artifact. Refuses to continue on any mismatch, which is what
   # makes it safe to pull from public mirrors: wrong bytes -> no boot, never a substitution.

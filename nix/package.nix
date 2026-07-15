@@ -4,8 +4,9 @@ rustPlatform.buildRustPackage {
   pname = "iron-instance";
   version = "0.1.0";
 
-  # Only the crate itself. nix/, target/ and the flake plumbing contribute nothing to the
-  # binary and would otherwise churn the derivation hash on every edit to a shell script.
+  # Only the crate itself. nix/, target/, docs and the flake plumbing contribute nothing to
+  # the binary and would otherwise churn the derivation hash on every edit to a shell script
+  # or a README. tests/ stays: doCheck runs cargo test.
   src = lib.cleanSourceWith {
     src = ironSrc;
     filter = path: type:
@@ -15,7 +16,10 @@ rustPlatform.buildRustPackage {
         || lib.hasPrefix ".git" rel
         || lib.hasPrefix "result" rel
         || rel == "flake.nix"
-        || rel == "flake.lock");
+        || rel == "flake.lock"
+        || rel == "README.md"
+        || rel == "CLAUDE.md"
+        || rel == ".gitignore");
   };
 
   cargoLock.lockFile = ironSrc + "/Cargo.lock";

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ironSrc, ... }:
+{ config, lib, pkgs, modulesPath, ironSrc, ... }:
 
 let
   ironInstance = pkgs.callPackage ./package.nix { inherit ironSrc; };
@@ -39,6 +39,9 @@ let
   dataDir = "/var/lib/iron";
 in
 {
+  # image.repart is not in the default module set; it must be imported explicitly.
+  imports = [ "${modulesPath}/image/repart.nix" ];
+
   system.stateVersion = "25.05";
   networking.hostName = "ironserver-instance";
 
@@ -46,8 +49,10 @@ in
   # Boot / kernel
   ############################################################################
 
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = false;
+  # Nothing installs a bootloader into this image. The ESP contents declared in the
+  # image.repart block below ARE the boot path (systemd-boot as the EFI default loader,
+  # plus the UKI it loads); grub is NixOS's default installer, so disable it explicitly.
+  boot.loader.grub.enable = false;
 
   # configfs-tsm (CONFIG_TSM_REPORTS) is how the guest gets a TDX quote: write 64 bytes of
   # REPORTDATA to inblob, read the quote from outblob. Mainline since 6.7.
@@ -61,18 +66,69 @@ in
   ];
 
   ############################################################################
-  # Filesystems. make-disk-image.nix labels the partitions it creates (root:
-  # ext4 "nixos", ESP: vfat "ESP") but leaves declaring them to this config;
-  # evaluation fails without a root fileSystems entry.
+  # Image assembly (systemd-repart)
+  #
+  # The image is assembled OFFLINE in the Nix build sandbox by systemd-repart --
+  # no QEMU VM, no wall-clock filesystem writes. That is what makes it byte-
+  # reproducible: the old make-disk-image.nix built the disk inside a booted VM
+  # running on real time and could never hash the same twice. GPT and partition
+  # UUIDs derive from the module's fixed seed; the ESP is populated from declared
+  # files (no bootctl, so no random-seed and no FAT timestamps); the kernel,
+  # initrd, and cmdline ship as a single UKI (also the cleaner TDX measurement
+  # object). Reference: nixos/tests/appliance-repart-image.nix on nixos-25.05.
+  ############################################################################
+
+  image.repart = {
+    name = "iron-instance";
+    # 512-byte logical sectors: OVMF rejects the repart default of 4096, and GCP
+    # persistent disks are 512-logical, so 512 is what both the smoke test and the
+    # real target want.
+    sectorSize = 512;
+    partitions = {
+      "esp" = {
+        contents =
+          let
+            efiArch = config.nixpkgs.hostPlatform.efiArch;
+          in
+          {
+            # systemd-boot as the fallback EFI loader...
+            "/EFI/BOOT/BOOT${lib.toUpper efiArch}.EFI".source =
+              "${pkgs.systemd}/lib/systemd/boot/efi/systemd-boot${efiArch}.efi";
+            # ...and the UKI it boots (kernel + initrd + cmdline in one PE binary).
+            "/EFI/Linux/${config.system.boot.loader.ukiFile}".source =
+              "${config.system.build.uki}/${config.system.boot.loader.ukiFile}";
+          };
+        repartConfig = {
+          Type = "esp";
+          Format = "vfat";
+          SizeMinBytes = "256M"; # UKI is ~30 MB with linuxPackages_latest; leave headroom
+        };
+      };
+      "root" = {
+        storePaths = [ config.system.build.toplevel ];
+        repartConfig = {
+          Type = "root";
+          Format = "ext4";
+          Label = "root"; # fileSystems."/" mounts by this GPT partition label
+          # A floor, not padding: podman pulls the pinned vLLM OCI image (tens of GB)
+          # into /var/lib/containers on THIS fs at boot. (The 595 GB weights go on the
+          # separate ephemeral data disk, never here.) make-disk-image gave this via
+          # diskSize = 40960.
+          SizeMinBytes = "40G";
+        };
+      };
+    };
+  };
+
+  ############################################################################
+  # Filesystems. systemd-repart labels the GPT partitions it creates; the root
+  # fs is mounted by that partition label. Nothing mounts the ESP at runtime:
+  # UEFI reads it at boot and the image has no admin plane that would update it.
   ############################################################################
 
   fileSystems."/" = {
-    device = "/dev/disk/by-label/nixos";
+    device = "/dev/disk/by-partlabel/root";
     fsType = "ext4";
-  };
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-label/ESP";
-    fsType = "vfat";
   };
 
   ############################################################################

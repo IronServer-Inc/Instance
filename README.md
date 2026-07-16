@@ -129,22 +129,17 @@ depends on how the bytes are obtained.
 
 ### 4.0 Where — x86_64 Linux only, never a Mac
 
-`make-disk-image.nix` assembles the disk by **booting a QEMU VM**, so producing an `x86_64-linux`
-image means running `qemu-system-x86_64` on an x86_64 builder. On an Apple-Silicon Mac that binary
-would itself run under emulation — an x86 machine nested inside an emulated x86 process — and §4.3
-requires doing it **twice**. Use a plain x86_64 Linux box (no GPU needed to *build*; ~100 GB disk).
+The image is a NixOS system closure for `x86_64-linux`, and `systemd-repart` assembles it
+**offline in the Nix build sandbox** — no QEMU VM, no `/dev/kvm`, no VM system-features to enable.
+Building the closure still needs an `x86_64-linux` builder, and an Apple-Silicon Mac has none (the
+nix-darwin `linux-builder` is disabled under Determinate Nix, and Nix cannot come from Homebrew —
+both dead ends explained below). Use a plain x86_64 Linux box (no GPU needed to *build*; ~100 GB disk).
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 # log out/in, then from this directory:
-nix build .#image                    # -> result/nixos.img  (raw, ~40 GB sparse)
+nix build .#image                    # -> result/iron-instance.raw  (raw, ~40 GB sparse)
 ```
-
-The disk is assembled inside a QEMU VM, so the derivation requires the `kvm` system feature.
-On a builder without `/dev/kvm` (most cloud VMs unless nested virtualization is enabled), add
-`extra-system-features = kvm` to `/etc/nix/nix.custom.conf` (Determinate Nix manages `nix.conf`
-itself) and restart `nix-daemon`: QEMU is invoked with `accel=kvm:tcg`, so assembly falls back
-to software emulation — slower, byte-identical output.
 
 On a Mac you can still *evaluate* the flake (host-agnostic) to catch errors and refresh
 `flake.lock` — `cargo clean` first (a non-git flake copies its whole dir into the store), then
@@ -175,21 +170,29 @@ Two independent builds must be byte-identical. Do not publish a measurement you 
 reproduced.
 
 ```sh
-nix build .#image --rebuild
-sha256sum result/nixos.img           # must equal the first build, byte for byte
+nix build .#image --rebuild          # exits 0 only if byte-identical to the first build
+sha256sum result/iron-instance.raw   # record this — it is the published image hash
 ```
 
-If they differ, `diffoscope` the two **raw** images (that is why we build raw, not qcow2) and fix
-the nondeterminism — timestamps and filesystem UUIDs are the usual culprits.
+If they differ, localize before changing anything: `--rebuild --keep-failed` leaves the second
+output at `<store-path>.check`; hash the ESP and root regions separately (offsets are the
+`image.repart` partition sizes) and `cmp -l` to count differing bytes per region. repart removes
+make-disk-image's leaks at the source (no VM wall-clock, no `bootctl` random-seed), so any residual
+is small — hunt it, do not paper over it with normalization hacks.
 
 ### 4.3 Boot-test locally (no GPU needed)
 
+The image boots via UEFI (a UKI in the ESP), so QEMU needs OVMF firmware; the raw file in the Nix
+store is read-only, so run it under `-snapshot`. TCG (software emulation) is fine — no KVM needed.
+
 ```sh
-qemu-system-x86_64 -m 4096 -drive file=result/nixos.img,format=raw -nographic
+OVMF=$(nix build --no-link --print-out-paths 'nixpkgs#OVMF.fd')/FV/OVMF.fd
+qemu-system-x86_64 -machine q35 -m 4096 -bios "$OVMF" \
+  -drive file=result/iron-instance.raw,format=raw -snapshot -nographic
 ```
 
-Attestation and vLLM will fail (no TDX, no GPU) — expected. You are only checking that the image
-boots, `iron-instance` starts, and it binds `:443`.
+Attestation and vLLM will fail (no TDX, no GPU) — expected. You are only checking that the kernel +
+UKI boot, the root partition mounts, `iron-instance` starts, and it binds `:443`.
 
 ### 4.4 Read the measurement (only real TDX emits it)
 
@@ -234,7 +237,7 @@ each attestation envelope and never need a pin.
 |---|---|---|
 | `artifacts.json` | `model.*`, `vllm.digest`, `vllm.args` | what runs; measured |
 | `src/attestation.rs` | `EXPECTED_GPU_COUNT = 8` | GPU reports required; mirror in iOS |
-| `configuration.nix` | `diskSize = 40960` (MiB) | OS partition only; weights go on the data disk |
+| `configuration.nix` | `image.repart` root `SizeMinBytes = "40G"` | root fs floor (OS + the vLLM OCI pull); weights go on the data disk |
 | `configuration.nix` | `hardware.nvidia.package`, `boot.kernelPackages` | driver + kernel; `open = true` is required for CC |
 | `configuration.nix` env | `IRON_VLLM_URL`, `IRON_GPU_REPORT_CMD`, `IRON_MANIFEST_PATH` | wiring; do not point off-box |
 | runtime env | `IRON_INSTANCE_PORT` | dev-only override of `:443` (unset in the image) |

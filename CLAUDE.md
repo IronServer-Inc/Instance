@@ -103,14 +103,15 @@ NixOS, CUDA, the NVIDIA driver, and TDX toolchains move monthly. Before writing:
 - `WebSearch` / `WebFetch` the vendor page. **Do not invent flags, ioctls, or report layouts.**
 - Kernel TDX: <https://docs.kernel.org/arch/x86/tdx.html>; configfs-tsm ABI on LWN.
 - NVIDIA CC: <https://docs.nvidia.com/nvtrust/>.
-- Nix image builders: `make-disk-image.nix` in nixpkgs. Use **raw**, not qcow2 — reproducibility
-  is gated by diffing two builds and `diffoscope` cannot diff qcow2.
+- Nix image builder: the `image.repart` module (`nixos/modules/image/repart.nix`), which assembles
+  the disk offline with `systemd-repart`. Output is **raw**, uncompressed: reproducibility is gated
+  by byte-diffing two builds. Reference shape: `nixos/tests/appliance-repart-image.nix`.
 
-**The image builds on `x86_64-linux` only.** `make-disk-image.nix` boots a QEMU VM to assemble
-the disk, so an ARM Mac would have to emulate an x86 machine inside an emulated x86 process. Do
-not send the user down the nix-darwin `linux-builder` path: it is disabled under Determinate Nix
-(`nix.enable = false` is required for coexistence, and it takes the `nix.*` options with it).
-README § 3 records both dead ends.
+**The image builds on `x86_64-linux` only.** Not because of a build-time VM — repart needs none —
+but because the image *is* an `x86_64-linux` system closure, and an ARM Mac has no `x86_64-linux`
+builder. Do not send the user down the nix-darwin `linux-builder` path: it is disabled under
+Determinate Nix (`nix.enable = false` is required for coexistence, and it takes the `nix.*` options
+with it). README § 4.0 records both dead ends (linux-builder, Homebrew Nix).
 
 ## What "tested" means here
 

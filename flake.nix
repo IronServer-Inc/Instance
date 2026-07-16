@@ -8,8 +8,9 @@
   outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      # This pkgs only drives the crate build, the image-assembly tooling and pin-artifacts,
-      # all free software. Unfree handling for the NVIDIA driver lives in nix/configuration.nix
+      # This pkgs only drives the crate build and pin-artifacts, all free software (image
+      # assembly now happens inside nixosSystem, via systemd-repart in the module set).
+      # Unfree handling for the NVIDIA driver lives in nix/configuration.nix
       # (nixpkgs.config.allowUnfreePredicate) because nixosSystem instantiates its own nixpkgs
       # and never sees config set here.
       pkgs = import nixpkgs { inherit system; };
@@ -30,20 +31,10 @@
         # without paying for a full image build.
         iron-instance = pkgs.callPackage ./nix/package.nix { inherit ironSrc; };
 
-        # RAW, not qcow2: reproducibility is gated by diffing two independent builds, and
-        # diffoscope cannot diff qcow2 filesystems.
-        image = import "${nixpkgs}/nixos/lib/make-disk-image.nix" {
-          inherit pkgs;
-          inherit (pkgs) lib;
-          config = self.nixosConfigurations.instance.config;
-          format = "raw";
-          partitionTableType = "efi";
-          diskSize = 40960; # MiB. Only the OS + service; weights land on the ephemeral data disk.
-          # Reproducibility knobs: without these the image carries a fresh UUID and mtimes on
-          # every build and can never hash the same twice.
-          deterministic = true;
-          touchEFIVars = false;
-        };
+        # The appliance image, assembled offline by systemd-repart (definition lives in
+        # nix/configuration.nix, image.repart). Raw and uncompressed -- reproducibility is
+        # gated by byte-diffing two independent builds, so never qcow2, never compressed.
+        image = self.nixosConfigurations.instance.config.system.build.image;
 
         default = self.packages.${system}.image;
       };

@@ -84,6 +84,13 @@ in
     # persistent disks are 512-logical, so 512 is what both the smoke test and the
     # real target want.
     sectorSize = 512;
+    # Pin the ext4 directory-hash seed. mke2fs otherwise generates a RANDOM htree
+    # hash seed per run -- the one identifier systemd-repart's --seed does not fix --
+    # leaving 20 bytes different in every ext4 superblock copy (s_hash_seed[16] +
+    # s_checksum[4]) and failing the reproducibility gate. Reuse the repart seed so
+    # the image has a single fixed "random" identifier. (Timestamps are already
+    # reproducible via stdenv's SOURCE_DATE_EPOCH, honored by mke2fs and the vfat path.)
+    mkfsOptions.ext4 = [ "-E" "hash_seed=${config.image.repart.seed}" ];
     partitions = {
       "esp" = {
         contents =

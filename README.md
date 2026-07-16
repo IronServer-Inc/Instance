@@ -141,6 +141,18 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 nix build .#image                    # -> result/iron-instance.raw  (raw, ~40 GB sparse)
 ```
 
+**One build-host prerequisite** (replaces the old KVM one): repart assembles the partitions in a
+nested user namespace (`unshare --map-root-user fakeroot systemd-repart`). Ubuntu 23.10+ blocks
+unprivileged userns by default, so the build fails with `unshare: write failed /proc/self/uid_map:
+Operation not permitted`. Clear it on the build host (not in the image — it has no effect on the
+output):
+
+```sh
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0    # persist: /etc/sysctl.d/
+```
+
+Distros without that restriction (or building as real root) need nothing.
+
 On a Mac you can still *evaluate* the flake (host-agnostic) to catch errors and refresh
 `flake.lock` — `cargo clean` first (a non-git flake copies its whole dir into the store), then
 `nix flake check`. You cannot build the image there. Use the **Determinate** installer because it

@@ -88,7 +88,11 @@ in
       "esp" = {
         contents =
           let
-            efiArch = config.nixpkgs.hostPlatform.efiArch;
+            # pkgs.stdenv.hostPlatform, NOT config.nixpkgs.hostPlatform: this flake sets the
+            # platform through nixosSystem's `system` arg, which populates nixpkgs.system --
+            # the nixpkgs.hostPlatform *option* stays undefined, so reading it errors. This is
+            # also how uki.nix itself reads efiArch.
+            efiArch = pkgs.stdenv.hostPlatform.efiArch;
           in
           {
             # systemd-boot as the fallback EFI loader...

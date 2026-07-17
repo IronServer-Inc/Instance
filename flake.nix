@@ -3,7 +3,7 @@
 
   # Pinned by flake.lock. `nix flake update` is a deliberate act: it changes the image, hence
   # the measurement, hence Constants.Attestation.expectedImageMeasurement in the iOS app.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs = { self, nixpkgs }:
     let

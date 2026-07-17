@@ -200,7 +200,22 @@ in
   # lockout is deliberate. Here it is the design: no SSH, no console, no admin plane.
   users.allowNoPasswordLogin = true;
   security.sudo.enable = false;
-  services.getty.autologinUser = null;
+
+  # No login prompt anywhere -- not even a locked one. `console=ttyS0` (above) makes
+  # systemd's getty generator want a serial-getty on that console, which is how a
+  # login prompt appeared on the first smoke test. Disabling the virtual console
+  # means NixOS never installs the upstream getty units at all
+  # (`systemd.additionalUpstreamSystemUnits` in nixos/modules/services/ttys/getty.nix
+  # is gated on this option), so the generator's symlink points at a unit that does
+  # not exist and nothing spawns. root is already password-locked, so no login could
+  # succeed -- this removes the door rather than locking it, per the trust model: on
+  # GCP the serial port is reachable by the project owner, who we treat as untrusted,
+  # and an agetty/PAM prompt is attack surface inside the TEE that buys us nothing.
+  #
+  # This does NOT silence the console: kernel/systemd output on ttyS0 is driven by the
+  # `console=` kernel parameter, not by this option. Boot logs (which carry no user
+  # plaintext) still reach the serial console, which is how the first TDX boot is read.
+  console.enable = false;
 
   networking.firewall = {
     enable = true;

@@ -58,6 +58,25 @@ in
   # REPORTDATA to inblob, read the quote from outblob. Mainline since 6.7.
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernelModules = [ "tdx_guest" ];
+
+  # An appliance image has no hardware-configuration.nix, so the initrd's storage
+  # drivers must be declared here. Without them stage 1 binds no block device,
+  # /dev/disk/by-partlabel/root never appears, and the boot dies in stage 1.
+  #   nvme        THE one that matters in production: GCP third-generation and later
+  #               machine series (C3/A3/A4) attach Hyperdisk/PD and Local SSD over
+  #               NVMe, and GCP requires the NVMe driver be present in the initramfs
+  #               to mount root. Also covers the ephemeral weights disk.
+  #   virtio_*    the QEMU/OVMF smoke test (-drive if=virtio); virtio_scsi also covers
+  #               older GCP series that attach PD over virtio-scsi.
+  #   sd_mod      turns a SCSI/SATA host (virtio_scsi, ahci) into /dev/sd*.
+  boot.initrd.availableKernelModules = [
+    "nvme"
+    "virtio_pci"
+    "virtio_blk"
+    "virtio_scsi"
+    "sd_mod"
+    "ahci"
+  ];
   # systemd mounts configfs at /sys/kernel/config; the TSM directory appears under it.
   boot.kernelParams = [
     "console=ttyS0"

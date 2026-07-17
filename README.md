@@ -199,12 +199,19 @@ store is read-only, so run it under `-snapshot`. TCG (software emulation) is fin
 
 ```sh
 OVMF=$(nix build --no-link --print-out-paths 'nixpkgs#OVMF.fd')/FV/OVMF.fd
-qemu-system-x86_64 -machine q35 -m 4096 -bios "$OVMF" \
-  -drive file=result/iron-instance.raw,format=raw -snapshot -nographic
+nix shell nixpkgs#qemu -c qemu-system-x86_64 \
+  -machine q35 -m 4096 -smp 2 -bios "$OVMF" \
+  -drive file=result/iron-instance.raw,format=raw,if=virtio \
+  -snapshot -nographic
 ```
 
-Attestation and vLLM will fail (no TDX, no GPU) — expected. You are only checking that the kernel +
-UKI boot, the root partition mounts, `iron-instance` starts, and it binds `:443`.
+Exit QEMU with **`Ctrl-A` then `X`** (`Ctrl-C` goes to the guest). The console stays quiet after
+handoff — the image sets `systemd.show_status=false` and has no console login by design — so you
+are **not** looking for a prompt. Success is reaching `<<< NixOS Stage 1 >>>` and then mounting the
+root partition without a panic. The `iron-*` units will fail (no data disk, no TDX, no GPU, no
+manifest) — expected here; this test only proves the kernel, UKI, and root mount work. The failure
+that matters is `waiting for device /dev/disk/by-partlabel/root` timing out, which means
+`boot.initrd.availableKernelModules` lacks the driver for your disk.
 
 ### 4.4 Read the measurement (only real TDX emits it)
 

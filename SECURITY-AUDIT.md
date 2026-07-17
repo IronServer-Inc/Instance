@@ -226,3 +226,8 @@ I noted these while reading but did not confirm exploitability. Reason about eac
 The user does the final build + gate + smoke test on the VM, and publishes the sha256 in the
 GitHub release notes at that exact commit. Every change you make here moves the image hash — that
 is expected. The `MRTD` is still pending the first real TDX boot and is **not** this task.
+
+
+## USER NOTE
+
+Please, also clean up the docs in Instance, because there is a lot of unnecessary stuff for production (users and potential hackers reading it) as well as depricated information. Try to write less and more explanatory of code (don't write docs for me, write from me).

@@ -22,8 +22,9 @@ use iron_instance::state::{Anchors, AppState, BootContext, MemberStore};
 const APPACCOUNT_NAMESPACE: [u8; 16] =
     [0xda, 0xfb, 0x6e, 0x23, 0x9c, 0x4d, 0x5d, 0x27, 0xaa, 0x05, 0x3f, 0x6c, 0x2e, 0x9e, 0x7b, 0x14];
 
-// Pinned Orchestrator management pubkey (raw 65-byte X9.63 P-256). DevInstance pins a dev key;
-// Instance/ pins the real one. Same code path (option B) -- only this data file differs.
+// Pinned Orchestrator management pubkey (raw 65-byte X9.63 P-256). Public by design: it is
+// measured and published, and the private half lives only in Supabase secrets. The test build
+// pins this same production key deliberately -- rotating it changes the measurement.
 const ORCH_MANAGE_PUBKEY_SEC1: &[u8] = include_bytes!("../pinned/orchestrator_manage_pubkey.sec1");
 
 #[tokio::main]

@@ -1,11 +1,10 @@
 //! POST /v1/chat/completions -- OpenAI-compatible, bearer-authenticated SSE streaming.
 //!
 //! Proxies to vLLM on loopback. The request body is forwarded verbatim and vLLM's SSE frames are
-//! relayed byte-for-byte, so the wire shape is exactly the OpenAI one the client already speaks
-//! (and exactly what DevInstance's echo model emulates).
+//! relayed byte-for-byte, so the wire shape is exactly the OpenAI one the client already speaks.
 //!
 //! The allowlist is re-checked between frames, so a /manage revoke lands mid-generation: the
-//! stream is cut and an error frame -- identical to DevInstance's -- is emitted.
+//! stream is cut and an error frame is emitted.
 //!
 //! This is the only place the Instance talks to anything, and it is loopback only. Nothing here
 //! is logged: the body is the user's plaintext prompt.
@@ -30,8 +29,8 @@ use crate::state::AppState;
 /// vLLM's OpenAI-compatible server, bound to loopback inside the CVM.
 const DEFAULT_UPSTREAM: &str = "http://127.0.0.1:8000/v1/chat/completions";
 
-/// Byte-for-byte the frame DevInstance emits, so the client handles revocation identically
-/// against either build.
+/// The frame the client parses to distinguish revocation from a dropped stream. Byte-identical
+/// across the production and test builds, so the client handles revocation the same against either.
 const REVOKED_FRAME: &str = "data: {\"error\":{\"message\":\"session revoked\",\"type\":\"revoked\"}}\n\n";
 
 fn upstream() -> String {
@@ -39,7 +38,7 @@ fn upstream() -> String {
 }
 
 /// One pooled client for the process. It cannot live in AppState: state.rs is kept
-/// byte-identical with DevInstance (option B).
+/// byte-identical across the production and test builds.
 fn client() -> &'static Client<HttpConnector, Full<Bytes>> {
     static CLIENT: OnceLock<Client<HttpConnector, Full<Bytes>>> = OnceLock::new();
     CLIENT.get_or_init(|| Client::builder(TokioExecutor::new()).build_http())

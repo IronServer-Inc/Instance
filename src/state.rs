@@ -16,8 +16,8 @@ pub type MemberHash = [u8; 32]; // sha256(sub || originalTransactionId)
 pub const DEVICE_CAP: u32 = 3;
 
 /// The client's mTLS public point, pulled from the TLS session's leaf cert. Threaded to the
-/// handlers as a request extension; production sets it from the peer cert (the mTLS-capture
-/// increment), tests set it directly.
+/// handlers as a request extension; the server sets it from the peer cert (see mtls.rs),
+/// integration tests set it directly.
 #[derive(Clone, Copy)]
 pub struct ClientPubkey(pub Pubkey);
 
@@ -109,10 +109,10 @@ pub struct BootContext {
     pub spki_sha256: [u8; 32],
 }
 
-/// Pinned trust anchors, injected so the step-2 tests can supply synthetic material while
+/// Pinned trust anchors, injected so the integration tests can supply synthetic material while
 /// production (main.rs) wires the real pinned values (include_bytes! JWKS + pubkey, in-repo
-/// Apple Root CA - G3 hash). DevInstance and Instance share this code; only the pinned data
-/// files differ (option B).
+/// Apple Root CA - G3 hash). The production and test builds share this code; only the pinned
+/// data files differ.
 pub struct Anchors {
     pub apple_jwt_keys: HashMap<String, DecodingKey>, // kid -> Apple Sign-In RSA key
     pub apple_issuer: String,

@@ -269,15 +269,26 @@ The Rust service is fully tested (`cargo test` — 22 tests: enroll, manage, mTL
 golden vectors). **Everything below has never executed on the target hardware** and is the content
 of the first paid GPU session. Budget for it to overrun.
 
+Two things that used to be listed here are now **validated** and are no longer open:
+
+- **Reproducible byte-identical rebuild** — the §4.2 gate passes: two builds of the same tree hash
+  identically (first proven 2026-07-16, including across a freshly created build VM). It took two
+  source-level fixes, both in `image.repart`: a pinned ext4 directory hash seed (`mkfsOptions.ext4`
+  `-E hash_seed=`, which `mke2fs` otherwise randomises per run) and the move off `make-disk-image`.
+  The **measurement** is still open — only real TDX hardware emits `MRTD` (§4.4).
+- **The boot path** — the image boots under QEMU/OVMF (§4.3): UEFI → systemd-boot → UKI → initrd →
+  root mount → stage 2. This does **not** cover GCP's NVMe attachment or TDX; see below.
+
 | Surface | Why unverified | Lives in |
 |---|---|---|
-| **configfs-tsm under a locked-down service** | `iron-instance.service` runs `DynamicUser` + only `CAP_NET_BIND_SERVICE`, but creating a `/sys/kernel/config/tsm/report/*` entry needs root/`CAP_DAC_OVERRIDE`. **As wired, every `/attestation` may 503.** Fix + validate first. | `nix/configuration.nix`, `src/attestation.rs` |
+| **configfs-tsm under a locked-down service** | creating a `/sys/kernel/config/tsm/report/*` entry needs root/`CAP_DAC_OVERRIDE`, and `iron-instance.service` runs `DynamicUser`. `CAP_DAC_OVERRIDE` **is now wired** in both cap lists — but it has never run against real configfs-tsm, so the sandbox interaction is unproven. If `/attestation` 503s on first TDX boot, start here. | `nix/configuration.nix`, `src/attestation.rs` |
+| **initrd storage modules on real GCP** | `boot.initrd.availableKernelModules` carries `nvme` (GCP mandates the NVMe driver in the initramfs for 3rd-gen+ C3/A3/A4) — validated only against QEMU's `virtio_blk`, never against a real GCP NVMe boot disk | `nix/configuration.nix` |
 | NVIDIA driver in CC mode; NVML attestation over all 8 GPUs | needs a B200 with CC on | `nix/configuration.nix`, `nix/gpu-report.py` |
 | NVLE mode + per-GPU `FEATURE_FLAG == MPT` | the one CC value inferred, not confirmed on B200; verifier fails closed if wrong | `nix/gpu-report.py`, `src/attestation.rs`, iOS `AttestationVerifier` |
 | Real signed-report layout (request‖response, 8 device certs) | modelled on nvtrust + a Hopper sample; never parsed from a live B200 | `src/attestation.rs`, iOS `AttestationVerifier` |
 | TDX quote via configfs-tsm | needs TDX hardware | `src/attestation.rs` |
 | Which metadata flavor serves user-data (EC2/GCE/OpenStack probe order) | GCE for this deployment; confirm + prune | `nix/fetch-manifest.sh` |
-| Reproducible byte-identical rebuild + the measurement | only a real TDX boot emits `MRTD` | §4.2, §4.4 |
+| The measurement (`MRTD`) | only a real TDX boot emits it; the reproducibility gate it depends on is green (above) | §4.4 |
 
 Fix findings **inside `nix/gpu-report.py`** where you can — nothing upstream depends on how the
 bytes are obtained.

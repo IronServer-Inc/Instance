@@ -1,7 +1,6 @@
 //! POST /enroll  { apple_identity_jwt, storekit_jws } -> { session_token }
 //!
-//! Real verification (this surface is not stubbed -- only attestation + model are). Mirrors
-//! architecture.md § First Instance Connection:
+//! Mirrors architecture.md § First Instance Connection:
 //!   - Apple identity JWT (RS256) vs the pinned JWKS (apple_jwks.rs).
 //!   - StoreKit JWS (ES256) with its x5c chain walked to a pinned Apple Root CA - G3, then the
 //!     JWS verified with the leaf key (mirrors Orchestrator/_shared/{x509_chain,storekit_verify}.ts).

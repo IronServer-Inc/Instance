@@ -77,11 +77,20 @@ in
     "sd_mod"
     "ahci"
   ];
+  # Explicit, not inherited: nixos-26.05 flipped this default to true. The initrd is part
+  # of what the image measures and attests to, so which implementation runs is a decision
+  # that belongs in this file rather than something upstream can change under us.
+  boot.initrd.systemd.enable = true;
+
   # systemd mounts configfs at /sys/kernel/config; the TSM directory appears under it.
+  # Boot status is deliberately NOT suppressed. There is no console user to hide it from
+  # (console.enable = false below removes every getty), so this console is output-only --
+  # silencing it closes no attack surface. It also leaks nothing: the image is published
+  # and measured, so its unit names are already public in this file. What it does buy is
+  # the ability to read why a boot failed on real TDX hardware, where the serial console
+  # is the only diagnostic channel an image with no admin plane has.
   boot.kernelParams = [
     "console=ttyS0"
-    # The instance has no console user and no admin plane.
-    "systemd.show_status=false"
   ];
 
   ############################################################################

@@ -3,7 +3,6 @@
 //! `payload` is base64url(JSON action bytes); `signature` is base64url(raw r||s, 64 B) of a
 //! P-256 ECDSA (SHA-256) signature over those exact payload bytes by the pinned Orchestrator
 //! management key. Verify -> replay-guard on the payload nonce -> apply the typed action.
-//! This surface is REAL in both DevInstance and Instance (only the pinned pubkey file differs).
 //!
 //! Worst case if the Orchestrator is compromised: it can revoke legitimate users (DoS). It
 //! cannot read messages or impersonate anyone (architecture.md § vLLM Instance).

@@ -1,9 +1,12 @@
-//! IronServer vLLM Instance -- DevInstance build.
+//! IronServer vLLM Instance.
 //!
-//! Four endpoints (`/attestation`, `/enroll`, `/v1/chat/completions`, `/manage`) with exactly
-//! two things stubbed for on-Mac development: the attestation report bytes and the model output
-//! (echo). Everything else is intended to be byte-for-byte the production (`Instance/`)
-//! behaviour. See ../plan.md for the two-folder split and what is stubbed.
+//! Four endpoints (`/attestation`, `/enroll`, `/v1/chat/completions`, `/manage`). Nothing here
+//! is stubbed: the production build (`Instance/`) performs real Intel TDX + NVIDIA CC
+//! attestation and proxies a real vLLM. The sibling test build (`Instance-test/`) is this same
+//! code with exactly one file changed -- `attestation.rs`, whose GPU half software-signs
+//! synthetic reports because a non-CC GPU cannot emit a real one; its CPU half is the real TDX
+//! quote. Every other module is byte-identical between the two and must stay that way.
+//! See ../architecture.md § vLLM Instance.
 
 pub mod apple_jwks;
 pub mod attestation;

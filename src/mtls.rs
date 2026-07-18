@@ -34,6 +34,11 @@ use crate::state::{ClientPubkey, Pubkey};
 
 /// Pull the uncompressed X9.63 P-256 point (0x04 || X || Y) out of a leaf certificate's SPKI.
 /// Anything that is not exactly a 65-byte uncompressed point is rejected.
+///
+/// We do not separately assert the SPKI algorithm OID (id-ecPublicKey / P-256). We do not need to:
+/// rustls verifies the handshake CertificateVerify signature against the cert's *declared*
+/// algorithm (verify_tls13_signature below), so a leaf whose 65 `0x04` bytes are labelled as some
+/// other algorithm cannot complete the handshake -- key possession, not the byte shape, is the gate.
 pub fn client_point_from_cert(der: &[u8]) -> Option<Pubkey> {
     let (_, cert) = X509Certificate::from_der(der).ok()?;
     let point = &cert.public_key().subject_public_key.data;

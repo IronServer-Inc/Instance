@@ -29,7 +29,7 @@ let
 
   # Vendor-specific seam: asks NVIDIA's tooling for a signed GPU attestation report over our
   # nonce and prints {"report": "<b64>", "cert_chain": ["<b64-DER>", ...]}.
-  # MUST be validated on real B200 hardware (T2) -- see README § Known unvalidated surfaces.
+  # Not yet validated on real B200 hardware -- see README § Known unvalidated surfaces.
   gpuReport = pkgs.writeShellApplication {
     name = "iron-gpu-report";
     runtimeInputs = [ (pkgs.python3.withPackages (ps: [ ps.pynvml ])) ];
@@ -330,8 +330,8 @@ in
       # /sys/kernel/config/tsm/report/, which is root-owned; configfs-tsm gives no group-writable
       # path, so a DynamicUser (non-root) service needs DAC override to mkdir there. Without it
       # every /attestation fails EACCES -> 503. Scoped to this single-purpose service in a CVM
-      # with no admin plane; still least-privilege vs running as root. T2: confirm the quote path
-      # works under this exact sandbox on the first real TDX boot.
+      # with no admin plane; still least-privilege vs running as root. Confirm the quote path works
+      # under this exact sandbox on the first real TDX boot.
       AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" "CAP_DAC_OVERRIDE" ];
       CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" "CAP_DAC_OVERRIDE" ];
       DynamicUser = true;

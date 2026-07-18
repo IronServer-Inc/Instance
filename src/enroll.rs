@@ -9,7 +9,7 @@
 //!   - originalTransactionId dedup, cap DEVICE_CAP.
 //!
 //! Every credential failure collapses to 401; policy failures (appAccountToken / manifest) to
-//! 403; the device cap to 429 -- matching implementation.md § Phase 9.
+//! 403; the device cap to 429.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -80,7 +80,11 @@ pub async fn handler(
         _ => return err(StatusCode::FORBIDDEN, "appAccountToken mismatch"),
     }
 
-    // member_hash = sha256(sub || originalTransactionId); sub is discarded after this.
+    // member_hash = sha256(sub || originalTransactionId); sub is discarded after this. The
+    // concatenation has no length separator, but both inputs are Apple-assigned (an opaque `sub`
+    // and a numeric transaction id), never attacker-chosen, so the ("ab","c")/("a","bc") ambiguity
+    // is unreachable. This exact byte layout is a contract with the Orchestrator's freeze_manifest;
+    // changing it is a coordinated break across both components and the manifest format.
     let mut hasher = Sha256::new();
     hasher.update(claims.sub.as_bytes());
     hasher.update(tx.original_transaction_id.as_bytes());
@@ -138,6 +142,38 @@ fn verify_storekit_jws(jws: &str, root_sha256: &[u8; 32], expected_bundle_id: &s
     // Verify cert[i] is signed by cert[i+1] (x509-parser auto-detects P-256/P-384/RSA).
     for i in 0..parsed.len() - 1 {
         parsed[i].verify_signature(Some(parsed[i + 1].public_key())).map_err(|_| ())?;
+    }
+
+    // A signature walk proves each link is signed by the next, not that the next is *allowed* to
+    // sign certs -- without these constraints an attacker's own end-entity cert chaining to the
+    // pinned root could pose as an intermediate and sign a forged leaf. So require every non-leaf to
+    // be a CA (basicConstraints CA:TRUE) within its pathLen, permit keyCertSign wherever keyUsage is
+    // present, and every cert to be inside its validity window. Apple's real chain satisfies all of
+    // these; this rejects only forgeries.
+    for (depth, cert) in parsed.iter().enumerate() {
+        if !cert.validity().is_valid() {
+            return Err(());
+        }
+        if depth == 0 {
+            continue; // the leaf is the end-entity signer, not an issuer
+        }
+        let Some(bc) = cert.basic_constraints().map_err(|_| ())? else {
+            return Err(()); // no basicConstraints -> not a CA
+        };
+        if !bc.value.ca {
+            return Err(());
+        }
+        if let Some(max) = bc.value.path_len_constraint {
+            let intermediates_below = (depth as u32) - 1; // exclude the leaf at index 0
+            if intermediates_below > max {
+                return Err(());
+            }
+        }
+        if let Ok(Some(ku)) = cert.key_usage() {
+            if !ku.value.key_cert_sign() {
+                return Err(());
+            }
+        }
     }
 
     // from_ec_der wants the raw SEC1 point (0x04 || X || Y), not the SPKI wrapper.

@@ -21,7 +21,7 @@ OUT="${1:?usage: iron-fetch-manifest <output-path>}"
 die() { echo "iron-manifest: FATAL: $*" >&2; exit 1; }
 
 # Provider metadata endpoints, tried in order. Which flavor the chosen provider
-# answers is a T2 item: confirm on the first real boot and prune the rest.
+# answers is confirmed on the first real boot; prune the rest then.
 fetch_user_data() {
   local out
   # EC2 / IMDS style

@@ -14,7 +14,7 @@ use serde::Deserialize;
 pub const SIGN_IN_WITH_APPLE_JWKS: &[u8] = include_bytes!("../pinned/apple_sign_in_jwks.json");
 
 pub const APPLE_ISSUER: &str = "https://appleid.apple.com";
-// Apple identity-token audience == the app Bundle ID (root CLAUDE.md pinned facts).
+// Apple identity-token audience == the app Bundle ID.
 pub const APPLE_AUDIENCE: &str = "com.rayeeev.IronServer";
 
 // App Store Server (StoreKit) verification uses the x5c chain to Apple Root CA - G3, not a

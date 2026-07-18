@@ -10,12 +10,6 @@ it hashes to the measurement in the release notes, and read every line that runs
 plaintext. There are no dev flags, no stub code paths, and no secrets in the tree — that is the
 whole point of the trust model (§1).
 
-> Historically the code lived in two hand-mirrored folders (`Instance/` = real attestation +
-> real vLLM; a `DevInstance/` twin = synthetic attestation + echo model for Mac-side app
-> testing). `Instance/` is now standalone. If you keep a dev twin, keep only `attestation.rs`
-> and `chat.rs` divergent and every other `src/` file byte-identical — nothing here depends on
-> that twin existing.
-
 ---
 
 ## 1. Security model in one paragraph
@@ -79,9 +73,15 @@ POST  /v1/chat/completions          OpenAI-compatible, bearer-auth, SSE, proxied
 POST  /manage                       Orchestrator-signed admin ops (revoke a slot); DoS-only worst case
 ```
 
+`/attestation` runs before enrollment, so it cannot be bearer-gated — but the mTLS handshake
+already proved cohort membership, so it is rate-limited per client pubkey (a token bucket, since a
+single call mints a TDX quote and attests 8 GPUs; without the cap one member could starve inference
+for the other 399).
+
 **RAM-only state** (gone at power-off): the allowlist `client_pubkey -> {member_hash,
-session_token, rate_limits}` and the `originalTransactionId -> device_count` dedup table (cap 3).
-`sub` is verified at enroll and immediately discarded.
+session_token}`, the per-pubkey `/attestation` rate-limit buckets, and the
+`originalTransactionId -> device_count` dedup table (cap 3). `sub` is verified at enroll and
+immediately discarded.
 
 ---
 
@@ -131,9 +131,8 @@ depends on how the bytes are obtained.
 
 The image is a NixOS system closure for `x86_64-linux`, and `systemd-repart` assembles it
 **offline in the Nix build sandbox** — no QEMU VM, no `/dev/kvm`, no VM system-features to enable.
-Building the closure still needs an `x86_64-linux` builder, and an Apple-Silicon Mac has none (the
-nix-darwin `linux-builder` is disabled under Determinate Nix, and Nix cannot come from Homebrew —
-both dead ends explained below). Use a plain x86_64 Linux box (no GPU needed to *build*; ~100 GB disk).
+Building the closure still needs an `x86_64-linux` builder, which an Apple-Silicon Mac does not have.
+Use a plain x86_64 Linux box (no GPU needed to *build*; ~100 GB disk).
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
@@ -263,21 +262,17 @@ each attestation envelope and never need a pin.
 
 ---
 
-## 6. Known unvalidated surfaces (be honest here)
+## 6. Known unvalidated surfaces
 
-The Rust service is fully tested (`cargo test` — 22 tests: enroll, manage, mTLS, chat proxy, crypto
-golden vectors). **Everything below has never executed on the target hardware** and is the content
-of the first paid GPU session. Budget for it to overrun.
+The Rust service is fully tested (`cargo test` — 25 tests: enroll incl. the x5c path-constraint
+rejections, manage, mTLS, chat proxy, the /attestation rate limit, crypto golden vectors).
+**Everything below has never executed on the target hardware** and is the content of the first paid
+GPU session. Budget for it to overrun.
 
-Two things that used to be listed here are now **validated** and are no longer open:
-
-- **Reproducible byte-identical rebuild** — the §4.2 gate passes: two builds of the same tree hash
-  identically (first proven 2026-07-16, including across a freshly created build VM). It took two
-  source-level fixes, both in `image.repart`: a pinned ext4 directory hash seed (`mkfsOptions.ext4`
-  `-E hash_seed=`, which `mke2fs` otherwise randomises per run) and the move off `make-disk-image`.
-  The **measurement** is still open — only real TDX hardware emits `MRTD` (§4.4).
-- **The boot path** — the image boots under QEMU/OVMF (§4.3): UEFI → systemd-boot → UKI → initrd →
-  root mount → stage 2. This does **not** cover GCP's NVMe attachment or TDX; see below.
+Two things are settled and no longer open: the **byte-identical rebuild** gate (§4.2) passes, and
+the **boot path** runs under QEMU/OVMF (§4.3, UEFI → systemd-boot → UKI → initrd → root mount).
+Neither covers GCP's NVMe attachment or TDX, and the **measurement** stays open until real TDX
+hardware emits `MRTD` (§4.4).
 
 | Surface | Why unverified | Lives in |
 |---|---|---|
@@ -315,16 +310,14 @@ nix/
   fetch-manifest.sh    same pattern for the cohort manifest (launch parameter)
   pin-artifacts.sh     build-time: resolve to immutable digests/hashes
   gpu-report.py        the one vendor seam (NVML)
-tests/                 22 tests
+tests/                 25 tests
 ```
 
 ---
 
-## 8. Test node (non-production hardware)
+## 8. There is no non-CC mode in this image
 
-A functional test node — GCP 8×B200 + Intel TDX **with GPU Confidential Computing off** — is a
-**separate build**, not this image with a flag flipped, because the production attestation gates
-(GPU CC in `gpu-report.py`, `FEATURE_FLAG == MPT` in the verifier) refuse non-CC GPUs by design.
-Keep that variant in its own folder so this image stays audit-clean: same `src/` except the
-attestation path, which drops the NVIDIA-CC requirement. See that folder's README for exactly what
-diverges and how to keep it in sync. **Never** relax an attestation gate in *this* folder.
+Pre-hardware testing on a node whose GPUs have Confidential Computing off is done from a **separate,
+never-published build** — not a flag on this one. This image has no path that accepts a non-CC GPU:
+`gpu-report.py` refuses anything but CC + NVLE, and the client rejects any report whose signed
+`FEATURE_FLAG` is not `MPT`. Those gates are not relaxable here by design.

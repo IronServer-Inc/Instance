@@ -1,12 +1,9 @@
 //! IronServer vLLM Instance.
 //!
-//! Four endpoints (`/attestation`, `/enroll`, `/v1/chat/completions`, `/manage`). Nothing here
-//! is stubbed: the production build (`Instance/`) performs real Intel TDX + NVIDIA CC
-//! attestation and proxies a real vLLM. The sibling test build (`Instance-test/`) is this same
-//! code with exactly one file changed -- `attestation.rs`, whose GPU half software-signs
-//! synthetic reports because a non-CC GPU cannot emit a real one; its CPU half is the real TDX
-//! quote. Every other module is byte-identical between the two and must stay that way.
-//! See ../architecture.md § vLLM Instance.
+//! Four endpoints (`/attestation`, `/enroll`, `/v1/chat/completions`, `/manage`). Nothing here is
+//! stubbed: real Intel TDX + NVIDIA CC attestation, a real vLLM proxy, no dev paths. Only
+//! `attestation.rs` may differ between this build and the non-CC test node; every other module is
+//! byte-identical and must stay that way.
 
 pub mod apple_jwks;
 pub mod attestation;

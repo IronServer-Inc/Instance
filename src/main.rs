@@ -30,8 +30,8 @@ const ORCH_MANAGE_PUBKEY_SEC1: &[u8] = include_bytes!("../pinned/orchestrator_ma
 #[tokio::main]
 async fn main() {
     // Boot TLS keypair, generated in process memory (production: sealed VM memory). P-256 /
-    // ecdsa-with-SHA256 so the iOS client can present a matching SecIdentity (Phase 8), and so
-    // both peers share one curve family.
+    // ecdsa-with-SHA256 so the iOS client can present a matching SecIdentity, and so both peers
+    // share one curve family.
     let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).expect("boot keygen");
     let spki_der = key_pair.subject_public_key_info();
     let spki_sha256: [u8; 32] = Sha256::digest(&spki_der[..]).into();
@@ -70,8 +70,10 @@ async fn main() {
     };
     let app = build_router(state);
 
-    // Default :443 (production-identical). On macOS 443 is privileged; run dev unprivileged
-    // with IRON_INSTANCE_PORT=8443.
+    // Default :443. On macOS 443 is privileged, so dev runs unprivileged with IRON_INSTANCE_PORT.
+    // Not a production door: the image never sets it, nothing can set env vars (no admin plane), and
+    // the firewall admits only 443. Same goes for IRON_VLLM_URL / IRON_GPU_REPORT_CMD -- the image's
+    // own systemd wiring, not attacker-reachable input.
     let port: u16 = std::env::var("IRON_INSTANCE_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(443);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 

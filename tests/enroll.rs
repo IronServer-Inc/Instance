@@ -92,3 +92,38 @@ async fn fourth_device_for_same_transaction_is_429() {
     let (status, _) = call(app.clone(), enroll_request(&jwt, &jws, Some(pks[3]))).await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
 }
+
+// Finding 4.1: the x5c walk must enforce X.509 path constraints, not just link signatures. A
+// chain whose "intermediate" is signed correctly but is CA:FALSE (an end-entity presented as an
+// issuer) must be rejected. Without the basicConstraints check this returns 200.
+#[tokio::test]
+async fn non_ca_intermediate_is_rejected() {
+    let chain = make_chain_non_ca_intermediate();
+    let orch = orch_signing_key();
+    let pk = client_pk(1);
+    let manifest = manifest(&[(pk, member_hash(SUB, ORIG_TX))]);
+    let app = app(anchors(chain.root_sha256, *orch.verifying_key()), manifest, MemberStore::default());
+
+    let jwt = make_apple_jwt(SUB);
+    let jws = make_storekit_jws(&chain, ORIG_TX, &app_account_token(SUB));
+    let (status, _) = call(app, enroll_request(&jwt, &jws, Some(pk))).await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "a CA:FALSE intermediate must not be accepted as an issuer");
+}
+
+// Finding 4.1: every cert must be inside its validity window. An intermediate whose notAfter is in
+// the past must be rejected even though its signature still verifies.
+#[tokio::test]
+async fn expired_intermediate_is_rejected() {
+    let chain = make_chain_expired_intermediate();
+    let orch = orch_signing_key();
+    let pk = client_pk(1);
+    let manifest = manifest(&[(pk, member_hash(SUB, ORIG_TX))]);
+    let app = app(anchors(chain.root_sha256, *orch.verifying_key()), manifest, MemberStore::default());
+
+    let jwt = make_apple_jwt(SUB);
+    let jws = make_storekit_jws(&chain, ORIG_TX, &app_account_token(SUB));
+    let (status, _) = call(app, enroll_request(&jwt, &jws, Some(pk))).await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "an expired intermediate must not be accepted");
+}

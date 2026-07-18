@@ -26,8 +26,7 @@ Two consequences that override convenience:
 ## Standalone, with a test sibling
 
 `Instance/` is the **standalone production build** — real Intel TDX + NVIDIA attestation, real
-vLLM, the published/measured image. (An earlier `DevInstance/` twin, a Mac-side synthetic build,
-has been removed; nothing here depends on it.)
+vLLM, the published/measured image.
 
 The sibling `../Instance-test/` is a **non-CC test node** build (GCP 8×B200 + Intel TDX, GPU
 Confidential Computing off): identical to this folder except `src/attestation.rs`, which keeps
@@ -115,10 +114,11 @@ with it). README § 4.0 records both dead ends (linux-builder, Homebrew Nix).
 
 ## What "tested" means here
 
-`cargo test` (22 tests) covers enroll, manage, mTLS, the chat proxy, and the crypto helpers.
-It does **not** cover: the image building, the NVIDIA driver in CC mode, NVML attestation, or
-the TDX quote path — none of which can run on a Mac. Those are the content of the first paid
-GPU session, and README § 6 lists them explicitly. Do not describe them as done.
+`cargo test` (25 tests) covers enroll (including the x5c path-constraint rejections), manage, mTLS,
+the chat proxy, the /attestation rate limit, and the crypto helpers. It does **not** cover: the
+image building, the NVIDIA driver in CC mode, NVML attestation, or the TDX quote path — none of
+which can run on a Mac. Those are the content of the first paid GPU session, and README § 6 lists
+them explicitly. Do not describe them as done.
 
 Reproducibility is a **gate**, not a hope: build twice, `sha256sum` both, and only then pin a
 measurement.

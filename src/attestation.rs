@@ -37,12 +37,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
-use crate::state::AppState;
+use crate::state::{AppState, ClientPubkey};
 use crate::{b64_decode_any, hex_decode, hex_encode};
 
 /// configfs-tsm report interface (Linux >= 6.7, CONFIG_TSM_REPORTS).
@@ -54,7 +54,7 @@ const TSM_REPORT_ROOT: &str = "/sys/kernel/config/tsm/report";
 /// in that same order, refusing (nonzero exit) if the GPU count disagrees or any GPU is not in
 /// Confidential Computing mode. Isolating the vendor SDK behind one contract keeps the service
 /// free of Python and confines the vendor-specific part to a single file (nix/gpu-report.py).
-/// MUST be validated on real hardware (T2).
+/// Not yet run against real hardware.
 const GPU_REPORT_CMD: &str = "/run/current-system/sw/bin/iron-gpu-report";
 
 /// GPUs on the HGX B200 board, all serving one tensor-parallel model. The client pins the same
@@ -67,7 +67,19 @@ pub struct AttestationQuery {
     nonce: Option<String>,
 }
 
-pub async fn handler(State(state): State<AppState>, Query(q): Query<AttestationQuery>) -> Response {
+pub async fn handler(
+    State(state): State<AppState>,
+    client: Option<Extension<ClientPubkey>>,
+    Query(q): Query<AttestationQuery>,
+) -> Response {
+    // Cap the expensive TDX-quote + 8-GPU work per member. mTLS already proved cohort membership
+    // and injected the client pubkey; if it is somehow absent, mTLS still gated the connection.
+    if let Some(Extension(ClientPubkey(pk))) = client {
+        if !state.members.allow_attestation(&pk) {
+            return err(StatusCode::TOO_MANY_REQUESTS, "attestation rate limit");
+        }
+    }
+
     let Some(nonce_hex) = q.nonce else {
         return err(StatusCode::BAD_REQUEST, "missing nonce");
     };

@@ -1,9 +1,8 @@
-//! Hashed member manifest handed to the VM as a launch parameter (architecture.md § Cohort
-//! Launch). The pointer (`manifest_url` + `manifest_sha256`) is resolved by the image's
-//! iron-manifest unit, which fetches and hash-verifies the bytes before this service starts
-//! and installs them at IRON_MANIFEST_PATH; this module parses them and answers membership
-//! queries. The attestation binding of the manifest hash (so the provider provably cannot
-//! swap manifests) remains a T2 item.
+//! Hashed member manifest handed to the VM as a launch parameter. The pointer (`manifest_url` +
+//! `manifest_sha256`) is resolved by the image's iron-manifest unit, which fetches and
+//! hash-verifies the bytes before this service starts and installs them at IRON_MANIFEST_PATH;
+//! this module parses them and answers membership queries. Binding the manifest hash into
+//! attestation (so the provider provably cannot swap manifests) is not yet exercised on hardware.
 
 use serde::Deserialize;
 

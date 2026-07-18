@@ -29,16 +29,14 @@ use crate::state::AppState;
 /// vLLM's OpenAI-compatible server, bound to loopback inside the CVM.
 const DEFAULT_UPSTREAM: &str = "http://127.0.0.1:8000/v1/chat/completions";
 
-/// The frame the client parses to distinguish revocation from a dropped stream. Byte-identical
-/// across the production and test builds, so the client handles revocation the same against either.
+/// The frame the client parses to distinguish a revocation from a dropped stream.
 const REVOKED_FRAME: &str = "data: {\"error\":{\"message\":\"session revoked\",\"type\":\"revoked\"}}\n\n";
 
 fn upstream() -> String {
     std::env::var("IRON_VLLM_URL").unwrap_or_else(|_| DEFAULT_UPSTREAM.to_string())
 }
 
-/// One pooled client for the process. It cannot live in AppState: state.rs is kept
-/// byte-identical across the production and test builds.
+/// One pooled client for the process, shared across all chat requests.
 fn client() -> &'static Client<HttpConnector, Full<Bytes>> {
     static CLIENT: OnceLock<Client<HttpConnector, Full<Bytes>>> = OnceLock::new();
     CLIENT.get_or_init(|| Client::builder(TokioExecutor::new()).build_http())

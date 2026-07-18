@@ -25,7 +25,7 @@ use iron_instance::state::{Anchors, AppState, BootContext, ClientPubkey, MemberS
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{SigningKey, VerifyingKey};
-use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair, PKCS_ECDSA_P256_SHA256};
+use rcgen::{date_time_ymd, BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair, PKCS_ECDSA_P256_SHA256};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tower::ServiceExt;
@@ -137,24 +137,49 @@ pub struct Chain {
 }
 
 /// Synthetic StoreKit chain: root (P-256 CA) -> intermediate (P-256 CA) -> leaf. The leaf key
-/// signs the JWS; the root's SHA-256 becomes the pinned anchor.
+/// signs the JWS; the root's SHA-256 becomes the pinned anchor. Certs are given an explicit,
+/// currently-open validity window so `verify_storekit_jws`'s validity gate passes deterministically.
 pub fn make_chain() -> Chain {
+    build_chain(true, false)
+}
+
+/// A chain whose "intermediate" is issued CA:FALSE -- the forged-intermediate attack (finding 4.1).
+pub fn make_chain_non_ca_intermediate() -> Chain {
+    build_chain(false, false)
+}
+
+/// A chain whose intermediate's validity window has already closed.
+pub fn make_chain_expired_intermediate() -> Chain {
+    build_chain(true, true)
+}
+
+/// Build a chain, optionally weakening the intermediate: `intermediate_is_ca=false` issues it
+/// CA:FALSE, `intermediate_expired=true` gives it a closed validity window. Both must be rejected
+/// by the X.509 path constraints in `verify_storekit_jws`.
+fn build_chain(intermediate_is_ca: bool, intermediate_expired: bool) -> Chain {
     let b64 = base64::engine::general_purpose::STANDARD;
+    let (valid_from, valid_to) = (date_time_ymd(2020, 1, 1), date_time_ymd(2100, 1, 1));
 
     let root_key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).unwrap();
     let mut root_params = CertificateParams::new(vec!["Synthetic Apple Root".to_string()]).unwrap();
     root_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    root_params.not_before = valid_from;
+    root_params.not_after = valid_to;
     let root_der = root_params.self_signed(&root_key).unwrap().der().to_vec();
     let root_issuer = Issuer::new(root_params, root_key);
 
     let int_key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).unwrap();
     let mut int_params = CertificateParams::new(vec!["Synthetic Apple WWDR".to_string()]).unwrap();
-    int_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    int_params.is_ca = if intermediate_is_ca { IsCa::Ca(BasicConstraints::Unconstrained) } else { IsCa::NoCa };
+    int_params.not_before = valid_from;
+    int_params.not_after = if intermediate_expired { date_time_ymd(2021, 1, 1) } else { valid_to };
     let int_der = int_params.signed_by(&int_key, &root_issuer).unwrap().der().to_vec();
     let int_issuer = Issuer::new(int_params, int_key);
 
     let leaf_key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).unwrap();
-    let leaf_params = CertificateParams::new(vec!["Synthetic Apple Leaf".to_string()]).unwrap();
+    let mut leaf_params = CertificateParams::new(vec!["Synthetic Apple Leaf".to_string()]).unwrap();
+    leaf_params.not_before = valid_from;
+    leaf_params.not_after = valid_to;
     let leaf_der = leaf_params.signed_by(&leaf_key, &int_issuer).unwrap().der().to_vec();
 
     Chain {

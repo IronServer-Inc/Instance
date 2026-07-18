@@ -50,7 +50,7 @@ checks the *per-GPU* enum from the signed report.
 ## UNVALIDATED ON HARDWARE
 
 The NVML calls below are written against NVIDIA's documented Confidential Computing API but have
-never run on a B200. Validate during the first paid GPU session (T2) and fix here only -- nothing
+never run on a B200. Validate during the first paid GPU session and fix here only -- nothing
 upstream of this file depends on how the bytes are obtained. The single assumption most likely to
 need a fix is the exact `multiGpuMode` / FEATURE_FLAG value a B200 emits in NVLink-encrypted mode.
 """

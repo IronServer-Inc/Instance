@@ -2,7 +2,7 @@
 //! which is what forces the full attestation + enroll flow on reconnect (architecture.md
 //! § Reconnection).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
@@ -14,7 +14,13 @@ use crate::manifest::Manifest;
 pub type Pubkey = [u8; 65]; // X9.63 uncompressed P-256: 0x04 || X || Y
 pub type MemberHash = [u8; 32]; // sha256(sub || originalTransactionId)
 
-pub const DEVICE_CAP: u32 = 3;
+/// Concurrent bearers one client_pubkey may hold.
+///
+/// The pubkey is a **user** identity, not a device one: a user's devices share one P-256
+/// keypair (architecture.md § Multiple devices), so "which device" is invisible here and
+/// each enroll simply mints another live bearer for the same identity. The cap is what
+/// keeps that from being unbounded.
+pub const DEVICE_CAP: usize = 3;
 
 // Per-pubkey token bucket for /attestation. It runs before enroll so it cannot be bearer-gated, but
 // mTLS already proved cohort membership (mtls.rs injects the pubkey), so it is capped per member:
@@ -29,6 +35,8 @@ pub const ATTEST_REFILL_PER_SEC: f64 = 0.1; // sustained 1 per 10s after the bur
 #[derive(Clone, Copy)]
 pub struct ClientPubkey(pub Pubkey);
 
+/// One enroll's worth of membership: the identity that enrolled, plus the bearer being minted
+/// for it right now. What the store keeps is a `Member`, which accumulates these bearers.
 #[derive(Clone)]
 pub struct MemberEntry {
     pub client_pubkey: Pubkey,
@@ -37,17 +45,25 @@ pub struct MemberEntry {
     pub original_tx_id: String,
 }
 
+/// The stored form: one per client_pubkey, holding every bearer currently live for it.
+#[derive(Clone)]
+struct Member {
+    member_hash: MemberHash,
+    original_tx_id: String,
+    /// Live bearers, oldest first. Bounded by `DEVICE_CAP`.
+    sessions: VecDeque<String>,
+}
+
 #[derive(Default)]
 struct Inner {
-    by_pubkey: HashMap<Pubkey, MemberEntry>,
+    by_pubkey: HashMap<Pubkey, Member>,
     by_token: HashMap<String, Pubkey>,
-    consumed: HashMap<String, u32>,             // original_tx_id -> device_count
     seen_nonces: HashSet<String>,               // /manage replay guard
     attest_buckets: HashMap<Pubkey, (f64, Instant)>, // /attestation token bucket: (tokens, last refill)
 }
 
-/// `allowlist: client_pubkey -> { member_hash, session_token, ... }` plus a bearer index for
-/// O(1) chat auth, the `consumed` dedup counter, and the /manage nonce set. Cloneable handle.
+/// `allowlist: client_pubkey -> { member_hash, [session_token; <=DEVICE_CAP] }` plus a bearer
+/// index for O(1) chat auth, and the /manage nonce set. Cloneable handle.
 #[derive(Clone, Default)]
 pub struct MemberStore {
     inner: Arc<RwLock<Inner>>,
@@ -64,8 +80,9 @@ impl MemberStore {
         self.inner.write().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub fn device_count(&self, tx_id: &str) -> u32 {
-        *self.read_guard().consumed.get(tx_id).unwrap_or(&0)
+    /// How many bearers this pubkey currently holds. Test/observability seam.
+    pub fn session_count(&self, pubkey: &Pubkey) -> usize {
+        self.read_guard().by_pubkey.get(pubkey).map_or(0, |m| m.sessions.len())
     }
 
     /// Take a token from this pubkey's /attestation bucket. False -> over the limit (429). See the
@@ -84,26 +101,52 @@ impl MemberStore {
         }
     }
 
-    /// Insert (or refresh) an allowlist entry. A first-time client_pubkey bumps the
-    /// per-transaction device counter and is rejected (false -> 429) once original_tx_id is at
-    /// DEVICE_CAP; re-enrolling an existing device just rotates its bearer without counting.
+    /// Mint a bearer for this identity, keeping the ones it already holds.
+    ///
+    /// **This used to revoke on re-enroll, and that was wrong once devices began sharing a
+    /// keypair.** The old branch treated a known pubkey as "the same device reconnecting" and
+    /// dropped its previous bearer — so a user's second device, presenting the same synced key,
+    /// silently logged the first one out, and the two would ping-pong. A pubkey is a user, not a
+    /// device; a user legitimately holds several live bearers at once.
+    ///
+    /// At the cap the **oldest bearer is evicted, not the newest refused.** Refusing would strand
+    /// the user: nothing tells the Instance a device was wiped or the app deleted, so a stale
+    /// bearer occupies its slot until reboot, and a user who reinstalls `DEVICE_CAP` times could
+    /// not enroll at all. Eviction makes the cap behave like device slots — the newcomer displaces
+    /// the least-recently-enrolled, which then re-enrolls if it is still around.
+    ///
+    /// Always succeeds; the return value is retained so callers keep a place to handle a future
+    /// refusal, and because `/enroll`'s 429 branch is cheaper to keep than to re-derive.
     pub fn insert(&self, entry: MemberEntry) -> bool {
         let mut g = self.write_guard();
-        match g.by_pubkey.get(&entry.client_pubkey) {
-            None => {
-                if *g.consumed.get(&entry.original_tx_id).unwrap_or(&0) >= DEVICE_CAP {
-                    return false;
-                }
-                *g.consumed.entry(entry.original_tx_id.clone()).or_insert(0) += 1;
-            }
-            Some(old) => {
-                let old_token = old.session_token.clone();
-                g.by_token.remove(&old_token);
-            }
-        }
-        g.by_token.insert(entry.session_token.clone(), entry.client_pubkey);
         let pk = entry.client_pubkey;
-        g.by_pubkey.insert(pk, entry);
+
+        // Scoped so the &mut borrow of by_pubkey ends before by_token is touched.
+        let evicted: Vec<String> = {
+            let member = g.by_pubkey.entry(pk).or_insert_with(|| Member {
+                member_hash: entry.member_hash,
+                original_tx_id: entry.original_tx_id.clone(),
+                sessions: VecDeque::new(),
+            });
+            // A re-enroll re-asserts the identity: enroll.rs just matched this exact
+            // (pubkey, member_hash) pair against the manifest, so the fresh value wins.
+            member.member_hash = entry.member_hash;
+            member.original_tx_id = entry.original_tx_id.clone();
+            member.sessions.push_back(entry.session_token.clone());
+
+            let mut out = Vec::new();
+            while member.sessions.len() > DEVICE_CAP {
+                if let Some(old) = member.sessions.pop_front() {
+                    out.push(old);
+                }
+            }
+            out
+        };
+
+        for token in evicted {
+            g.by_token.remove(&token);
+        }
+        g.by_token.insert(entry.session_token, pk);
         true
     }
 
@@ -114,21 +157,34 @@ impl MemberStore {
     pub fn get_by_token(&self, token: &str) -> Option<MemberEntry> {
         let g = self.read_guard();
         let pk = g.by_token.get(token)?;
-        g.by_pubkey.get(pk).cloned()
+        let member = g.by_pubkey.get(pk)?;
+        Some(MemberEntry {
+            client_pubkey: *pk,
+            member_hash: member.member_hash,
+            session_token: token.to_string(),
+            original_tx_id: member.original_tx_id.clone(),
+        })
     }
 
     pub fn contains_token(&self, token: &str) -> bool {
         self.read_guard().by_token.contains_key(token)
     }
 
-    /// Remove the member whose member_hash matches; drops their bearer. Used by /manage revoke.
+    /// Remove the member whose member_hash matches; drops **every** bearer it holds. Used by
+    /// /manage revoke.
+    ///
+    /// Dropping all of them is the point: one identity now spans several devices, and a revoke
+    /// that cleared only one bearer would leave the user's other devices chatting on a slot the
+    /// operator just revoked.
     pub fn revoke_by_member_hash(&self, hash: &MemberHash) -> bool {
         let mut g = self.write_guard();
-        let pk = g.by_pubkey.iter().find(|(_, e)| &e.member_hash == hash).map(|(pk, _)| *pk);
+        let pk = g.by_pubkey.iter().find(|(_, m)| &m.member_hash == hash).map(|(pk, _)| *pk);
         match pk {
             Some(pk) => {
-                if let Some(e) = g.by_pubkey.remove(&pk) {
-                    g.by_token.remove(&e.session_token);
+                if let Some(m) = g.by_pubkey.remove(&pk) {
+                    for token in m.sessions {
+                        g.by_token.remove(&token);
+                    }
                 }
                 true
             }
@@ -150,6 +206,93 @@ mod tests {
         let mut p = [seed; 65];
         p[0] = 0x04;
         p
+    }
+
+    fn entry(pubkey: Pubkey, token: &str) -> MemberEntry {
+        MemberEntry {
+            client_pubkey: pubkey,
+            member_hash: [7u8; 32],
+            session_token: token.to_string(),
+            original_tx_id: "tx-1".to_string(),
+        }
+    }
+
+    /// The regression that motivated the rework: a second device presenting the *same* synced
+    /// keypair must not log the first one out.
+    #[test]
+    fn a_second_enroll_on_one_pubkey_keeps_the_first_bearer() {
+        let store = MemberStore::default();
+        let a = pk(1);
+
+        assert!(store.insert(entry(a, "bearer-first")));
+        assert!(store.insert(entry(a, "bearer-second")));
+
+        assert!(store.contains_token("bearer-first"), "first device must stay enrolled");
+        assert!(store.contains_token("bearer-second"));
+        assert_eq!(store.session_count(&a), 2);
+    }
+
+    #[test]
+    fn bearers_are_capped_by_evicting_the_oldest() {
+        let store = MemberStore::default();
+        let a = pk(1);
+
+        for i in 0..DEVICE_CAP {
+            assert!(store.insert(entry(a, &format!("bearer-{i}"))));
+        }
+        assert_eq!(store.session_count(&a), DEVICE_CAP);
+
+        // One past the cap: the newcomer is admitted and the oldest goes, rather than the
+        // newcomer being refused and the user stranded behind stale bearers.
+        assert!(store.insert(entry(a, "bearer-newest")));
+        assert_eq!(store.session_count(&a), DEVICE_CAP);
+        assert!(!store.contains_token("bearer-0"), "oldest bearer must be evicted");
+        assert!(store.contains_token("bearer-newest"));
+        assert!(store.contains_token(&format!("bearer-{}", DEVICE_CAP - 1)));
+    }
+
+    #[test]
+    fn one_pubkeys_cap_does_not_touch_another() {
+        let store = MemberStore::default();
+        let a = pk(1);
+        let b = pk(2);
+
+        for i in 0..(DEVICE_CAP + 2) {
+            store.insert(entry(a, &format!("a-{i}")));
+        }
+        store.insert(entry(b, "b-only"));
+
+        assert_eq!(store.session_count(&a), DEVICE_CAP);
+        assert!(store.contains_token("b-only"));
+    }
+
+    #[test]
+    fn revoke_drops_every_bearer_the_identity_holds() {
+        let store = MemberStore::default();
+        let a = pk(1);
+
+        store.insert(entry(a, "device-1"));
+        store.insert(entry(a, "device-2"));
+
+        assert!(store.revoke_by_member_hash(&[7u8; 32]));
+
+        // A revoke that cleared only one would leave the user's other devices chatting.
+        assert!(!store.contains_token("device-1"));
+        assert!(!store.contains_token("device-2"));
+        assert_eq!(store.session_count(&a), 0);
+    }
+
+    #[test]
+    fn lookup_by_token_reports_the_identity_behind_that_bearer() {
+        let store = MemberStore::default();
+        let a = pk(1);
+        store.insert(entry(a, "device-1"));
+        store.insert(entry(a, "device-2"));
+
+        let found = store.get_by_token("device-2").expect("bearer must resolve");
+        assert_eq!(found.client_pubkey, a);
+        assert_eq!(found.session_token, "device-2");
+        assert_eq!(found.member_hash, [7u8; 32]);
     }
 
     #[test]

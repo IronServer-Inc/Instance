@@ -95,6 +95,27 @@ constant in the verifier) — nothing else upstream depends on how the bytes are
 
 ---
 
+## The allowlist is keyed by user, not by device
+
+`client_pubkey` identifies a **user**, not a device: a user's devices share one P-256
+keypair (architecture.md § Multiple devices), because the frozen cohort manifest carries
+exactly one pubkey per member. So `MemberStore` maps a pubkey to a *set* of live bearers,
+capped at `DEVICE_CAP`.
+
+`insert()` used to treat a known pubkey as "the same device reconnecting" and drop its
+previous bearer. That silently logged a user's other device out, and the two would
+ping-pong. Two rules follow, both load-bearing:
+
+- **Never revoke a bearer just because the pubkey is known.** Append instead.
+- **At the cap, evict the oldest; never refuse the newest.** Nothing tells the Instance a
+  device was wiped or the app deleted, so a stale bearer holds its slot until reboot —
+  refusing would let a user who reinstalls `DEVICE_CAP` times lock themselves out.
+
+`revoke_by_member_hash` must drop **every** bearer the identity holds; clearing one would
+leave the user's other devices chatting on a slot the operator just revoked.
+
+---
+
 ## Verification protocol (your cutoff is wrong here)
 
 NixOS, CUDA, the NVIDIA driver, and TDX toolchains move monthly. Before writing:
@@ -114,7 +135,8 @@ with it). README § 4.0 records both dead ends (linux-builder, Homebrew Nix).
 
 ## What "tested" means here
 
-`cargo test` (25 tests) covers enroll (including the x5c path-constraint rejections), manage, mTLS,
+`cargo test` (31 tests) covers enroll (including the x5c path-constraint rejections and the
+multi-bearer/eviction behaviour of the allowlist), manage, mTLS,
 the chat proxy, the /attestation rate limit, and the crypto helpers. It does **not** cover: the
 image building, the NVIDIA driver in CC mode, NVML attestation, or the TDX quote path — none of
 which can run on a Mac. Those are the content of the first paid GPU session, and README § 6 lists
